@@ -1,0 +1,325 @@
+---
+title: "Build GRASS GIS database"
+author: ""
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  NinaR::jensAnalysis:
+    highlight: tango
+    fig_caption: yes
+    toc: yes
+---
+
+
+```{r load_packages, message = F, warning = F}
+# Load packages
+require(dplyr)
+require(rgrass7)
+require(NinaR)
+
+require(sp)
+require(raster)
+require(terra)
+require(rgdal)
+require(sf)
+
+source("functions.R")
+```
+
+```{r setup, include=FALSE}
+# This is optional
+# I choose the 'styler' package for tidying the code to preserve indentations
+# I set the cutoff for code tidying to 60, but this doesn't currently work with styler.
+# Set tidy = True to get the knitr default
+# I want all figures as png and pdf in high quality in a subfolder called figure
+
+knitr::opts_chunk$set(
+  eval = FALSE, # do not run anything
+  echo = TRUE,
+  tidy = "styler",
+  dev = c("png", "pdf"),
+  dpi = 600,
+  fig.path = "figure/"
+)
+
+options(
+  xtable.comment = F,
+  xtable.include.rownames = F,
+  nina.logo.y.pos = 0.15
+)
+palette(ninaPalette())
+```
+
+
+```{r, include = F, eval = F}
+# This connects to the gisdatabase with a DBI connection named `con`.
+# Use for example dbGetQuery(con, "SELECT * FROM ....") to query the database
+postgreSQLConnect(
+  host = "gisdata-db.nina.no",
+  dbname = "gisdata",
+  username = "postgjest",
+  password = "gjestpost"
+)
+```
+
+# Connect to GRASS GIS
+
+We start by connecting the R session to GRASS GIS, in my local user mapset (`u_bernardo.brandao`).
+
+```{r connectGRASS}
+# Connect to GRASS
+NinaR::grassConnect(location = "ETRS_33N", mapset = "user")
+
+# example of command
+#execGRASS("g.mapset", parameters = list(), flags = )
+```
+
+
+# Get read access to the existing mapsets
+
+```{r}
+# list all mapsets
+sep <- " "
+all_mapsets <- execGRASS("g.mapsets", flags = c("l"), intern = T) %>% 
+  strsplit(sep) %>% 
+  first()
+
+# list mapsets for "rein"
+mapset_patt_rein <- c("Rein", "rein") %>% 
+  paste(collapse = "|")
+mapsets_rein <- all_mapsets %>% 
+  grep(pattern = mapset_patt_rein, value = T)
+
+# list mapsets for "Prodchange"
+mapset_patt_pc <- c("change") %>% 
+  paste(collapse = "|")
+mapsets_pc <- all_mapsets %>% 
+  grep(pattern = mapset_patt_pc, value = T) %>% 
+  grep(pattern = paste(mapsets_rein,collapse = "|"), invert = T, value = T)
+
+# list some more mapsets we know we'll use
+land_use_mapsets <- c("p_RenRein_norut", "g_LandCover_Norway_NORUT_SAM_TT", "p_prodchange_envpolyTT")
+landscape_mapsets <- c("g_Elevation_Fenoscandia", "g_LandCover_Fenoscndia_PHENOLOGY_SAM_TT", 
+                       "g_Elevation_Fenoscandia_TPI")
+climate_mapsets <- c("g_BiogeographicalRegions_Norway_PCA_klima", "u_bram.van.moorter",
+                     "g_EnergyResources_Fenoscandia", "u_torkildtveraa")
+infrastructure_mapsets <- c("p_prodchange_envpointsTT", "p_prodchange_roadsTT", "p_RenRein_trails2", 
+                            "p_prodchange_trailsTT")
+
+all_relevant_mapsets <- c(mapsets_rein, mapsets_pc, 
+                          land_use_mapsets, landscape_mapsets, 
+                          climate_mapsets, infrastructure_mapsets) %>% 
+  unique()
+
+# access to those mapsets
+execGRASS("g.mapsets", parameters = list(mapset = all_relevant_mapsets))
+```
+
+
+# Create new mapsets
+
+Let's create the new mapsets here. There are six mapsets:
+
+- `climate_phenology`
+- `landscape`
+- `species`
+- `industr`
+- `transport_urban`
+- `urban`
+
+Describe the idea of each one here.
+
+```{r create_mapsets}
+# Create mapsets
+mapsets <- c("climate_phenology", "landscape", "species", 
+             "industry", "transport_urban", "tourism")
+mapsets <- paste0("p_sam_", mapsets)
+
+for(ms in mapsets) {
+  execGRASS("g.mapset", parameters = list(mapset = ms), flags = "c")
+}
+```
+
+# Load data
+
+Before starting to load data, we define here some paths to the folders where the datasets are located. 
+If it is necessary, one can simply change the path and re-load the data.
+
+```{r paths}
+# Define paths
+
+# root folder Sweden
+sw_dir = "~/Mounts/R/Prosjekter/Rein/oneimpact/"
+```
+
+
+# Load landscape data
+
+## Data from Norway
+
+First we'll copy the datasets from Norway that have already been in use in the previous projects (e.g. Renewable Reindeer, Prodchange).
+
+```{r copy_landscape}
+# go into mapset
+ms <- "p_sam_landscape"
+execGRASS("g.mapset", mapset = ms)
+
+#---
+# settings
+type_of_info <- "landscape"
+
+#---
+# land use
+ms_from <- "p_RenRein_norut"
+maps <- execGRASS("g.list", type = "raster", mapset = ms_from, intern = T)
+
+# copy
+for(i in maps) {
+  map_in <- paste0(i, "@", ms_from)
+  map_out <- i
+  execGRASS("g.region", raster = map_in)
+  execGRASS("g.copy", raster=paste0(map_in, ",", map_out), flags = c("overwrite"))
+}
+
+# document
+md <- readr::read_csv("../data/spatialdb_metadata_oneimpact_20211122.csv")
+
+# maps used or not used earlier
+used <- grep("100", maps, value = T)
+not_used <- setdiff(maps, used)
+used_names <- c("agricultural lands", "glacier", "grasses", "heather in lowland", "heather in ridges",
+                "heathlands", "forest with lichens", "lichens", "meadows", "mires", "ridges", "forest",
+                "snow", "snowbed")
+not_used_names <- used_names
+all_maps <- c(used, not_used)
+all_names <- c(used_names, not_used_names)
+
+md_updated <- update_metadata(md, 
+                              maps = all_maps, 
+                              type_of_info = type_of_info,
+                              mapset_from = ms_from, 
+                              new_mapset = ms, 
+                              map_names = all_names, 
+                              institution = NA,
+                              description = NA, 
+                              unit = NA, 
+                              type_data = "raster",
+                              original_range_values = "0-1", 
+                              year_data = NA,
+                              original_pixel_res = 30, #??
+                              final_pixel_res = 100, 
+                              extent = "Norway",
+                              primary_derived = "Primary",
+                              derived_form = NA,
+                              website = NA, 
+                              source = NA, 
+                              obtained_through = "NINA", 
+                              observations = NA)
+
+# write updated metadata on the disk
+readr::write_csv(md, file = paste0("../data/spatialdb_metadata_oneimpact_", 
+                                   gsub("-", "", lubridate::today()), 
+                                   ".csv"))
+# put the old metadata file in archive
+system("mv ../data/spatialdb_metadata_oneimpact_20211122.csv ../data/old_metadata")
+
+#---
+# land use density
+# This data is present in the mapset "g_LandCover_Norway_NORUT_SAM_TT", but it should be recalculated
+# with the data from Sweden
+# But we need to compare the land use maps first
+
+#---
+# TPI densities - 50m
+ms_from <- "g_Elevation_Fenoscandia_TPI"
+maps <- execGRASS("g.list", type = "raster", mapset = ms_from, intern = T)
+
+# copy
+for(i in maps) {
+  map_in <- paste0(i, "@", ms_from)
+  map_out <- i
+  execGRASS("g.region", raster = map_in)
+  execGRASS("g.copy", raster=paste0(map_in, ",", map_out), flags = c("overwrite"))
+}
+
+# document
+md_file <- list.files("../data/", pattern = "spatialdb_metadata_oneimpact")
+md <- readr::read_csv(md_file)
+
+# maps used or not used earlier
+used <- grep("100", maps, value = T)
+not_used <- setdiff(maps, used)
+used_names <- c("agricultural lands", "glacier", "grasses", "heather in lowland", "heather in ridges",
+                "heathlands", "forest with lichens", "lichens", "meadows", "mires", "ridges", "forest",
+                "snow", "snowbed")
+not_used_names <- used_names
+all_maps <- c(used, not_used)
+all_names <- c(used_names, not_used_names)
+
+md_updated <- update_metadata(md, 
+                              maps = all_maps, 
+                              type_of_info = type_of_info,
+                              mapset_from = ms_from, 
+                              new_mapset = ms, 
+                              map_names = all_names, 
+                              institution = NA,
+                              description = NA, 
+                              unit = NA, 
+                              type_data = "raster",
+                              original_range_values = "0-1", 
+                              year_data = NA,
+                              original_pixel_res = 30, #??
+                              final_pixel_res = 100, 
+                              extent = "Norway",
+                              primary_derived = "Primary",
+                              derived_form = NA,
+                              website = NA, 
+                              source = NA, 
+                              obtained_through = "NINA", 
+                              observations = NA)
+
+# write updated metadata on the disk
+readr::write_csv(md, file = paste0("../data/spatialdb_metadata_oneimpact_", 
+                                   gsub("-", "", lubridate::today()), 
+                                   ".csv"))
+# put the old metadata file in archive
+system("mv ../data/spatialdb_metadata_oneimpact_20211122.csv ../data/old_metadata")
+
+mapsets <- c()
+```
+
+
+Now we load the landscape datasets into GRASS GIS.
+
+# Load species data
+
+Now we import species data
+
+```{r}
+# go into mapset
+execGRASS("g.mapset", parameters = list(mapset = "p_sam_species"))
+
+# folder with raw data
+species_dir <- paste0(sw_dir, "03_raster/p_sam_species/")
+
+# list maps in folder
+files <- list.files(species_dir, pattern = "tif$", full.names = T)
+
+test <- terra::rast(files[1])
+plot(test)
+
+# load predators data into GRASS
+for(i in file) {
+  
+  # prepare input name
+  name <- strsplit(i, "/", fixed = T)[[1]] %>% 
+    dplyr::last() %>% 
+    gsub(pattern = ".tif", replacement = "")
+  # execGRASS("r.in.gdal", parameters = list(input = i, output = name), flags = c("overwrite"))
+  
+  execGRASS("r.import", parameters = list(input = i, output = name), flags = c("overwrite"))
+}
+    
+# document
+
+```
+

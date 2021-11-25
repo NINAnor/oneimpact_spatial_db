@@ -1,0 +1,19 @@
+---
+title: "Questions: spatial db"
+author: "Bernardo Niebuhr"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  NinaR::jensAnalysis:
+    highlight: tango
+    fig_caption: yes
+    toc: yes
+---
+
+## Landscape variables
+
+- **Variables**: land use/cover classes, elevation and derived (slope, aspect, TPI, TPI density)  
+- Where should I get the elevation (dem, slope, aspect) from? g_Elevation_Fenoscandia?
+- g_Elevation_Fenoscandia_TPI: all maps with 50m. Should I resample them to 100m?
+- How to match land use classes from maps from Sweden and Norway? 
+Or should we use a single map for the whole region (a regional or Europe land use map)?
+- Define the above question before running density maps for land use
