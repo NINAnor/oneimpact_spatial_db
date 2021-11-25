@@ -49,18 +49,6 @@ options(
 palette(ninaPalette())
 ```
 
-
-```{r, include = F, eval = F}
-# This connects to the gisdatabase with a DBI connection named `con`.
-# Use for example dbGetQuery(con, "SELECT * FROM ....") to query the database
-postgreSQLConnect(
-  host = "gisdata-db.nina.no",
-  dbname = "gisdata",
-  username = "postgjest",
-  password = "gjestpost"
-)
-```
-
 # Connect to GRASS GIS
 
 We start by connecting the R session to GRASS GIS, in my local user mapset (`u_bernardo.brandao`).
@@ -148,7 +136,7 @@ If it is necessary, one can simply change the path and re-load the data.
 # Define paths
 
 # root folder Sweden
-sw_dir = "~/Mounts/R/Prosjekter/Rein/oneimpact/"
+sw_dir = "/data/P-Prosjekter/41203800_oneimpact/sam_raw_sw/"
 ```
 
 
@@ -181,7 +169,8 @@ for(i in maps) {
 }
 
 # document
-md <- readr::read_csv("../data/spatialdb_metadata_oneimpact_20211122.csv")
+md_file <- list.files("../data/", pattern = "spatialdb_metadata_oneimpact", full.names = T)
+md <- readr::read_csv(md_file)
 
 # maps used or not used earlier
 used <- grep("100", maps, value = T)
@@ -191,14 +180,14 @@ used_names <- c("agricultural lands", "glacier", "grasses", "heather in lowland"
                 "snow", "snowbed")
 not_used_names <- used_names
 all_maps <- c(used, not_used)
-all_names <- c(used_names, not_used_names)
+all_names <- paste0("Land cover: ", c(used_names, not_used_names))
 
 md_updated <- update_metadata(md, 
                               maps = all_maps, 
                               type_of_info = type_of_info,
                               mapset_from = ms_from, 
                               new_mapset = ms, 
-                              map_names = all_names, 
+                              variables = all_names, 
                               institution = NA,
                               description = NA, 
                               unit = NA, 
@@ -214,13 +203,14 @@ md_updated <- update_metadata(md,
                               source = NA, 
                               obtained_through = "NINA", 
                               observations = NA)
+md_updated
 
 # write updated metadata on the disk
-readr::write_csv(md, file = paste0("../data/spatialdb_metadata_oneimpact_", 
-                                   gsub("-", "", lubridate::today()), 
-                                   ".csv"))
+readr::write_csv(md_updated, file = paste0("../data/spatialdb_metadata_oneimpact_",
+                                           gsub("-", "", lubridate::today()),
+                                           ".csv"))
 # put the old metadata file in archive
-system("mv ../data/spatialdb_metadata_oneimpact_20211122.csv ../data/old_metadata")
+# system(paste("mv", md_file, "../data/old_metadata"))
 
 #---
 # land use density
@@ -229,7 +219,10 @@ system("mv ../data/spatialdb_metadata_oneimpact_20211122.csv ../data/old_metadat
 # But we need to compare the land use maps first
 
 #---
-# TPI densities - 50m
+# elevation, slope, aspect???
+
+#---
+# TPI - 50m
 ms_from <- "g_Elevation_Fenoscandia_TPI"
 maps <- execGRASS("g.list", type = "raster", mapset = ms_from, intern = T)
 
@@ -242,53 +235,62 @@ for(i in maps) {
 }
 
 # document
-md_file <- list.files("../data/", pattern = "spatialdb_metadata_oneimpact")
+md_file <- list.files("../data/", pattern = "spatialdb_metadata_oneimpact", full.names = T)
 md <- readr::read_csv(md_file)
 
-# maps used or not used earlier
-used <- grep("100", maps, value = T)
-not_used <- setdiff(maps, used)
-used_names <- c("agricultural lands", "glacier", "grasses", "heather in lowland", "heather in ridges",
-                "heathlands", "forest with lichens", "lichens", "meadows", "mires", "ridges", "forest",
-                "snow", "snowbed")
-not_used_names <- used_names
-all_maps <- c(used, not_used)
-all_names <- c(used_names, not_used_names)
+maps
+scales <- purrr::map(strsplit(maps, "_"), ~.[3]) %>% unlist()
+map_names <- paste0("Terrain Position Index: ", scales, "m")
 
 md_updated <- update_metadata(md, 
-                              maps = all_maps, 
+                              maps = maps, 
                               type_of_info = type_of_info,
                               mapset_from = ms_from, 
                               new_mapset = ms, 
-                              map_names = all_names, 
+                              variables = map_names, 
                               institution = NA,
                               description = NA, 
                               unit = NA, 
                               type_data = "raster",
-                              original_range_values = "0-1", 
+                              original_range_values = "ca. -1000-(+1000)", 
                               year_data = NA,
-                              original_pixel_res = 30, #??
-                              final_pixel_res = 100, 
-                              extent = "Norway",
-                              primary_derived = "Primary",
-                              derived_form = NA,
+                              original_pixel_res = "???", #??
+                              final_pixel_res = 50, 
+                              extent = "Fenoscandia",
+                              primary_derived = "Derived",
+                              derived_form = "???",
                               website = NA, 
                               source = NA, 
                               obtained_through = "NINA", 
                               observations = NA)
+md_updated
 
 # write updated metadata on the disk
-readr::write_csv(md, file = paste0("../data/spatialdb_metadata_oneimpact_", 
-                                   gsub("-", "", lubridate::today()), 
-                                   ".csv"))
+readr::write_csv(md_updated, file = paste0("../data/spatialdb_metadata_oneimpact_",
+                                           gsub("-", "", lubridate::today()),
+                                           ".csv"))
 # put the old metadata file in archive
-system("mv ../data/spatialdb_metadata_oneimpact_20211122.csv ../data/old_metadata")
-
-mapsets <- c()
+# system(paste("mv", md_file, "../data/old_metadata"))
 ```
 
+Now we load the landscape datasets from Sweden into GRASS GIS.
 
-Now we load the landscape datasets into GRASS GIS.
+```{r landscape_sweden}
+# folder
+landscape_dir = paste0(sw_dir, "03_raster/sam_landscape/")
+
+# load vegetation data - NMD - OK
+execGRASS("r.import", input = paste0(landscape_dir, "landcover_nmd_ungeneralized/nmd2018bas_ogeneraliserad_v1_0.tif"), 
+    output = "landcover_sw_nmd1_ungeneralized_10m_2018")
+
+"/data/P-Prosjekter/41203800_oneimpact/sam_raw_sw/02_vector/"
+
+# load auxiliary vegetation data - SMD - OK
+r.in_gdal(input = landscape_dir+"landcover_smd_generalized/mosaic/smdb99.tif", 
+    output = "landcover_smd_25m_2004")
+
+```
+
 
 # Load species data
 

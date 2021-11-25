@@ -37,7 +37,7 @@ bna <- function(input_map_grass, input_map_r, size_m, size_pixels, unit = "s", q
 # function to update the metadata
 update_metadata <- function(md, 
                             maps, type_of_info, mapset_from, new_mapset, 
-                            map_names, institution = NA, description = NA, 
+                            variables, institution = NA, description = NA, 
                             unit = NA, type_data = c("raster", "vector")[1],
                             original_range_values = NA, year_data = NA,
                             original_pixel_res = NA, final_pixel_res = NA,
@@ -62,7 +62,7 @@ update_metadata <- function(md,
     md$type_of_information[which_line] <- type_of_info
     md$old_folder[which_line] <- mapset_from
     md$folder[which_line] <- new_mapset
-    md$variable[which_line] <- map_names[cont]
+    md$variable[which_line] <- variables[cont]
     md$institution[which_line] <- institution
     md$description[which_line] <- description
     md$unit[which_line] <- unit

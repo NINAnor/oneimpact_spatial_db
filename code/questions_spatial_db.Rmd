@@ -11,9 +11,14 @@ output:
 
 ## Landscape variables
 
-- **Variables**: land use/cover classes, elevation and derived (slope, aspect, TPI, TPI density)  
+- **Variables**: land use/cover classes, elevation and derived (slope, aspect, TPI, TPI density)
+
 - Where should I get the elevation (dem, slope, aspect) from? g_Elevation_Fenoscandia?
+
 - g_Elevation_Fenoscandia_TPI: all maps with 50m. Should I resample them to 100m?
+Should I calculate it for more window sizes? so far, 250, 500, 1000, 2500, 5000, 10000
+
 - How to match land use classes from maps from Sweden and Norway? 
 Or should we use a single map for the whole region (a regional or Europe land use map)?
-- Define the above question before running density maps for land use
+
+- Define the issue above before running density maps for land use
