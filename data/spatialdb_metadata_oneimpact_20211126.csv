@@ -1,38 +1,43 @@
 layer_name,type_of_information,old_folder,folder,variable,institution,description,unit,type_of_spatial_data,original_raster_range_values,year_of_original_data,original_pixel_resolution,final_pixel_resolution,extent,primary_or_derived,derived_from,website,source,obtained_through,observations
-dem_tpi_1000_50m,landscape,g_Elevation_Fenoscandia_TPI,p_sam_landscape,Terrain Position Index: 1000m,NA,NA,NA,raster,ca. -1000-(+1000),NA,???,Fenoscandia,Fenoscandia,Derived,???,NA,NA,NINA,NA
-dem_tpi_10000_50m,landscape,g_Elevation_Fenoscandia_TPI,p_sam_landscape,Terrain Position Index: 10000m,NA,NA,NA,raster,ca. -1000-(+1000),NA,???,Fenoscandia,Fenoscandia,Derived,???,NA,NA,NINA,NA
-dem_tpi_250_50m,landscape,g_Elevation_Fenoscandia_TPI,p_sam_landscape,Terrain Position Index: 250m,NA,NA,NA,raster,ca. -1000-(+1000),NA,???,Fenoscandia,Fenoscandia,Derived,???,NA,NA,NINA,NA
-dem_tpi_2500_50m,landscape,g_Elevation_Fenoscandia_TPI,p_sam_landscape,Terrain Position Index: 2500m,NA,NA,NA,raster,ca. -1000-(+1000),NA,???,Fenoscandia,Fenoscandia,Derived,???,NA,NA,NINA,NA
-dem_tpi_500_50m,landscape,g_Elevation_Fenoscandia_TPI,p_sam_landscape,Terrain Position Index: 500m,NA,NA,NA,raster,ca. -1000-(+1000),NA,???,Fenoscandia,Fenoscandia,Derived,???,NA,NA,NINA,NA
-dem_tpi_5000_50m,landscape,g_Elevation_Fenoscandia_TPI,p_sam_landscape,Terrain Position Index: 5000m,NA,NA,NA,raster,ca. -1000-(+1000),NA,???,Fenoscandia,Fenoscandia,Derived,???,NA,NA,NINA,NA
-norut_dyrka,landscape,p_RenRein_norut,p_sam_landscape,Land cover: agricultural lands,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_dyrka_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: agricultural lands,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_glacier,landscape,p_RenRein_norut,p_sam_landscape,Land cover: glacier,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_glacier_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: glacier,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_grasses,landscape,p_RenRein_norut,p_sam_landscape,Land cover: grasses,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_grasses_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: grasses,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_heather_lowland,landscape,p_RenRein_norut,p_sam_landscape,Land cover: heather in lowland,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_heather_lowland_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: heather in lowland,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_heather_ridges,landscape,p_RenRein_norut,p_sam_landscape,Land cover: heather in ridges,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_heather_ridges_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: heather in ridges,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_heathland,landscape,p_RenRein_norut,p_sam_landscape,Land cover: heathlands,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_heathland_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: heathlands,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_lavskog,landscape,p_RenRein_norut,p_sam_landscape,Land cover: forest with lichens,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_lavskog_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: forest with lichens,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_lichen,landscape,p_RenRein_norut,p_sam_landscape,Land cover: lichens,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_lichen_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: lichens,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_meadows,landscape,p_RenRein_norut,p_sam_landscape,Land cover: meadows,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_meadows_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: meadows,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_myr,landscape,p_RenRein_norut,p_sam_landscape,Land cover: mires,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_myr_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: mires,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_ridges,landscape,p_RenRein_norut,p_sam_landscape,Land cover: ridges,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_ridges_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: ridges,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_skog,landscape,p_RenRein_norut,p_sam_landscape,Land cover: forest,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_skog_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: forest,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_snow,landscape,p_RenRein_norut,p_sam_landscape,Land cover: snow,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_snow_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: snow,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_snowbed,landscape,p_RenRein_norut,p_sam_landscape,Land cover: snowbed,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
-norut_snowbed_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: snowbed,NA,NA,NA,raster,0-1,NA,30,Norway,Norway,Primary,NA,NA,NA,NINA,NA
+dem_tpi_1000_50m,landscape,g_Elevation_Fenoscandia_TPI,p_sam_landscape,Terrain Position Index: 1000m,NA,NA,NA,raster,"[-721.45, 572.24]",NA,NA,50,Fenoscandia,Derived,???,NA,NA,NINA,NA
+dem_tpi_10000_50m,landscape,g_Elevation_Fenoscandia_TPI,p_sam_landscape,Terrain Position Index: 10000m,NA,NA,NA,raster,"[-1153.85, 1263.42]",NA,NA,50,Fenoscandia,Derived,???,NA,NA,NINA,NA
+dem_tpi_250_50m,landscape,g_Elevation_Fenoscandia_TPI,p_sam_landscape,Terrain Position Index: 250m,NA,NA,NA,raster,"[-442.64, 344.88]",NA,NA,50,Fenoscandia,Derived,???,NA,NA,NINA,NA
+dem_tpi_2500_50m,landscape,g_Elevation_Fenoscandia_TPI,p_sam_landscape,Terrain Position Index: 2500m,NA,NA,NA,raster,"[-971.05, 914.1]",NA,NA,50,Fenoscandia,Derived,???,NA,NA,NINA,NA
+dem_tpi_500_50m,landscape,g_Elevation_Fenoscandia_TPI,p_sam_landscape,Terrain Position Index: 500m,NA,NA,NA,raster,"[-590.79, 445.43]",NA,NA,50,Fenoscandia,Derived,???,NA,NA,NINA,NA
+dem_tpi_5000_50m,landscape,g_Elevation_Fenoscandia_TPI,p_sam_landscape,Terrain Position Index: 5000m,NA,NA,NA,raster,"[-1091.39, 1118.77]",NA,NA,50,Fenoscandia,Derived,???,NA,NA,NINA,NA
+digestible_biomass_summer,landscape,u_bram.van.moorter,p_sam_landscape,Digestible biomass in summer,NA,NA,NA,raster,"[-3012.1, 98187.3]",NA,NA,100,Norway,Derived,???,NA,NA,NINA,NA
+digestible_biomass_winter,landscape,u_bram.van.moorter,p_sam_landscape,Digestible biomass in winter,NA,NA,NA,raster,"[-811.3, 78710.2]",NA,NA,100,Norway,Derived,???,NA,NA,NINA,NA
+landcover_smd_25m_2004,landscape,SLU_spatial_db,p_sam_landscape,Land cover,Lantmäteriet,"This is a land cover map for Sweden (Svenska CORINE Marktäckedata - SMD), a map based on LANDSAT TM satellite images and several other products from Lantmæteriet and other Swedish institutions, with 57 land use classes and 25m resolution.",NA,raster,0-255,2004,25,25,Sweden,Primary,NA,CORINE Land Cover | Lantmäteriet (lantmateriet.se),CORINE Land Cover,SLU server,NA
+landcover_ungeneralized_NMD_10m_2018,landscape,SLU_spatial_db,p_sam_landscape,Land cover,Naturvårdsverket,"This is a layer corresponding to land cover. It was based on Sentinel-2 sattelite images from 2015-2018, with support for laser/LiDAR data and several other datasets.",NA,raster,0-255,2018,10,10,Sweden,Primary,NA,https://www.naturvardsverket.se/Sa-mar-miljon/Kartor/Nationella-Marktackedata-NMD/,Nationella marktäckedata 2018,SLU server,NA
+lichen_Sweden,landscape,SLU_spatial_db,p_sam_landscape,Lichen abundance,Sven Adler - SLU,Model of lichen abundance (or probability of occurrence) created based on remote sensing and generalized additive modeling,NA,raster,"[0, 100]",NA,10,10,"Reindeer herding area in Sweden, with exception of some reindeer herding districts",Derived,??,NA,NA,Sven Adler,NA
+norut_dyrka,landscape,p_RenRein_norut,p_sam_landscape,Land cover: agricultural lands,NA,NA,NA,raster,"0, 1",NA,30,100,Norway,Resampled,NORUT land use classes,NA,NA,NINA,NA
+norut_dyrka_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: agricultural lands,NA,NA,NA,raster,"0, 1",NA,30,30,Norway,Primary,NA,NA,NA,NINA,NA
+norut_glacier,landscape,p_RenRein_norut,p_sam_landscape,Land cover: glacier,NA,NA,NA,raster,"0, 1",NA,30,100,Norway,Resampled,NORUT land use classes,NA,NA,NINA,NA
+norut_glacier_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: glacier,NA,NA,NA,raster,"0, 1",NA,30,30,Norway,Primary,NA,NA,NA,NINA,NA
+norut_grasses,landscape,p_RenRein_norut,p_sam_landscape,Land cover: grasses,NA,NA,NA,raster,"0, 1",NA,30,100,Norway,Resampled,NORUT land use classes,NA,NA,NINA,NA
+norut_grasses_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: grasses,NA,NA,NA,raster,"0, 1",NA,30,30,Norway,Primary,NA,NA,NA,NINA,NA
+norut_heather_lowland,landscape,p_RenRein_norut,p_sam_landscape,Land cover: heather in lowland,NA,NA,NA,raster,"0, 1",NA,30,100,Norway,Resampled,NORUT land use classes,NA,NA,NINA,NA
+norut_heather_lowland_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: heather in lowland,NA,NA,NA,raster,"0, 1",NA,30,30,Norway,Primary,NA,NA,NA,NINA,NA
+norut_heather_ridges,landscape,p_RenRein_norut,p_sam_landscape,Land cover: heather in ridges,NA,NA,NA,raster,"0, 1",NA,30,100,Norway,Resampled,NORUT land use classes,NA,NA,NINA,NA
+norut_heather_ridges_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: heather in ridges,NA,NA,NA,raster,"0, 1",NA,30,30,Norway,Primary,NA,NA,NA,NINA,NA
+norut_heathland,landscape,p_RenRein_norut,p_sam_landscape,Land cover: heathlands,NA,NA,NA,raster,"0, 1",NA,30,100,Norway,Resampled,NORUT land use classes,NA,NA,NINA,NA
+norut_heathland_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: heathlands,NA,NA,NA,raster,"0, 1",NA,30,30,Norway,Primary,NA,NA,NA,NINA,NA
+norut_lavskog,landscape,p_RenRein_norut,p_sam_landscape,Land cover: forest with lichens,NA,NA,NA,raster,"0, 1",NA,30,100,Norway,Resampled,NORUT land use classes,NA,NA,NINA,NA
+norut_lavskog_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: forest with lichens,NA,NA,NA,raster,"0, 1",NA,30,30,Norway,Primary,NA,NA,NA,NINA,NA
+norut_lichen,landscape,p_RenRein_norut,p_sam_landscape,Land cover: lichens,NA,NA,NA,raster,"0, 1",NA,30,100,Norway,Resampled,NORUT land use classes,NA,NA,NINA,NA
+norut_lichen_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: lichens,NA,NA,NA,raster,"0, 1",NA,30,30,Norway,Primary,NA,NA,NA,NINA,NA
+norut_meadows,landscape,p_RenRein_norut,p_sam_landscape,Land cover: meadows,NA,NA,NA,raster,"0, 1",NA,30,100,Norway,Resampled,NORUT land use classes,NA,NA,NINA,NA
+norut_meadows_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: meadows,NA,NA,NA,raster,"0, 1",NA,30,30,Norway,Primary,NA,NA,NA,NINA,NA
+norut_myr,landscape,p_RenRein_norut,p_sam_landscape,Land cover: mires,NA,NA,NA,raster,"0, 1",NA,30,100,Norway,Resampled,NORUT land use classes,NA,NA,NINA,NA
+norut_myr_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: mires,NA,NA,NA,raster,"0, 1",NA,30,30,Norway,Primary,NA,NA,NA,NINA,NA
+norut_ridges,landscape,p_RenRein_norut,p_sam_landscape,Land cover: ridges,NA,NA,NA,raster,"0, 1",NA,30,100,Norway,Resampled,NORUT land use classes,NA,NA,NINA,NA
+norut_ridges_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: ridges,NA,NA,NA,raster,"0, 1",NA,30,30,Norway,Primary,NA,NA,NA,NINA,NA
+norut_skog,landscape,p_RenRein_norut,p_sam_landscape,Land cover: forest,NA,NA,NA,raster,"0, 1",NA,30,100,Norway,Resampled,NORUT land use classes,NA,NA,NINA,NA
+norut_skog_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: forest,NA,NA,NA,raster,"0, 1",NA,30,30,Norway,Primary,NA,NA,NA,NINA,NA
+norut_snow,landscape,p_RenRein_norut,p_sam_landscape,Land cover: snow,NA,NA,NA,raster,"0, 1",NA,30,100,Norway,Resampled,NORUT land use classes,NA,NA,NINA,NA
+norut_snow_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: snow,NA,NA,NA,raster,"0, 1",NA,30,30,Norway,Primary,NA,NA,NA,NINA,NA
+norut_snowbed,landscape,p_RenRein_norut,p_sam_landscape,Land cover: snowbed,NA,NA,NA,raster,"0, 1",NA,30,100,Norway,Resampled,NORUT land use classes,NA,NA,NINA,NA
+norut_snowbed_100,landscape,p_RenRein_norut,p_sam_landscape,Land cover: snowbed,NA,NA,NA,raster,"0, 1",NA,30,30,Norway,Primary,NA,NA,NA,NINA,NA
 beitedyr_10000,NA,u_bram.van.moorter,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
 beitedyr_5000,NA,u_bram.van.moorter,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA
 dem_10m_nosefi_float_slope,NA,g_Elevation_Fenoscandia,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA

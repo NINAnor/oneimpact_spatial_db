@@ -86,6 +86,8 @@ r.in_gdal(input = landscape_dir+"lichen_sven/lichen_model_sven_tassasen_callibra
 # load lichen map callibrated for Mittadalen
 r.in_gdal(input = landscape_dir+"lichen_sven/lichen_model_sven_mittadalen_mask_roads.tif",
     output = "lichen_model_mittadalen")
+    
+# clec
 
 #---------------------------------------
 # Load data - species data

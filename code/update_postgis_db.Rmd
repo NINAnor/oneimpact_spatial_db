@@ -21,8 +21,6 @@ require(raster)
 require(terra)
 require(rgdal)
 require(sf)
-
-source("functions.R")
 ```
 
 

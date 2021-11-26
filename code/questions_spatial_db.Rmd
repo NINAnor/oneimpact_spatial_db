@@ -11,14 +11,25 @@ output:
 
 ## Landscape variables
 
-- **Variables**: land use/cover classes, elevation and derived (slope, aspect, TPI, TPI density)
+- **Variables**: land use/cover classes, elevation and derived (slope, aspect, TPI at multiple scales), 
+lichen abundance (model), digestible biomass (model)
 
-- Where should I get the elevation (dem, slope, aspect) from? g_Elevation_Fenoscandia?
+- **General question: should I resample everything with is not 100m to 100m?**
+
+- Where should I get the elevation (dem, slope, aspect) from, for Norway? g_Elevation_Fenoscandia?
 
 - g_Elevation_Fenoscandia_TPI: all maps with 50m. Should I resample them to 100m?
 Should I calculate it for more window sizes? so far, 250, 500, 1000, 2500, 5000, 10000
+
+- Elevation for Sweden: we used a 10m res map, derived from a 2m res. But we have available maps for the whole
+Fenoscandia. Should we use this one?
 
 - How to match land use classes from maps from Sweden and Norway? 
 Or should we use a single map for the whole region (a regional or Europe land use map)?
 
 - Define the issue above before running density maps for land use
+
+- Lichen model for Norway?
+- Digestible biomass for Sweden? Should we keep the map for Norway in the database?
+
+

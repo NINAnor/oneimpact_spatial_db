@@ -2,6 +2,7 @@
 title: "Build GRASS GIS database"
 author: ""
 date: "`r format(Sys.time(), '%d %B, %Y')`"
+geometry: margin=2cm
 output: 
   NinaR::jensAnalysis:
     highlight: tango
@@ -13,9 +14,11 @@ output:
 ```{r load_packages, message = F, warning = F}
 # Load packages
 require(dplyr)
-require(rgrass7)
+require(purrr)
+require(readr)
 require(NinaR)
 
+require(rgrass7)
 require(sp)
 require(raster)
 require(terra)
@@ -85,7 +88,8 @@ mapsets_pc <- all_mapsets %>%
   grep(pattern = paste(mapsets_rein,collapse = "|"), invert = T, value = T)
 
 # list some more mapsets we know we'll use
-land_use_mapsets <- c("p_RenRein_norut", "g_LandCover_Norway_NORUT_SAM_TT", "p_prodchange_envpolyTT")
+land_use_mapsets <- c("p_RenRein_norut", "g_LandCover_Norway_NORUT_SAM_TT", 
+                      "p_prodchange_envpolyTT")
 landscape_mapsets <- c("g_Elevation_Fenoscandia", "g_LandCover_Fenoscndia_PHENOLOGY_SAM_TT", 
                        "g_Elevation_Fenoscandia_TPI")
 climate_mapsets <- c("g_BiogeographicalRegions_Norway_PCA_klima", "u_bram.van.moorter",
@@ -144,9 +148,11 @@ sw_dir = "/data/P-Prosjekter/41203800_oneimpact/sam_raw_sw/"
 
 ## Data from Norway
 
-First we'll copy the datasets from Norway that have already been in use in the previous projects (e.g. Renewable Reindeer, Prodchange).
+Here we'll copy the datasets from Norway that have already been in use in the previous projects (e.g. Renewable Reindeer, Prodchange).
 
-```{r copy_landscape}
+### Land use - NORUT
+
+```{r copy_landscape_NORUT}
 # go into mapset
 ms <- "p_sam_landscape"
 execGRASS("g.mapset", mapset = ms)
@@ -178,27 +184,51 @@ not_used <- setdiff(maps, used)
 used_names <- c("agricultural lands", "glacier", "grasses", "heather in lowland", "heather in ridges",
                 "heathlands", "forest with lichens", "lichens", "meadows", "mires", "ridges", "forest",
                 "snow", "snowbed")
+used_names <- paste0("Land cover: ", c(used_names))
 not_used_names <- used_names
-all_maps <- c(used, not_used)
-all_names <- paste0("Land cover: ", c(used_names, not_used_names))
 
+# used maps
 md_updated <- update_metadata(md, 
-                              maps = all_maps, 
+                              maps = used, 
                               type_of_info = type_of_info,
                               mapset_from = ms_from, 
                               new_mapset = ms, 
-                              variables = all_names, 
+                              variables = used_names, 
                               institution = NA,
                               description = NA, 
                               unit = NA, 
                               type_data = "raster",
-                              original_range_values = "0-1", 
+                              original_range_values = "0, 1", 
+                              year_data = NA,
+                              original_pixel_res = 30, #???
+                              final_pixel_res = 30, 
+                              extent = "Norway",
+                              primary_derived = "Primary",
+                              derived_form = NA,
+                              website = NA, 
+                              source = NA, 
+                              obtained_through = "NINA", 
+                              observations = NA)
+md_updated
+
+# maps unused earlier
+md_updated <- update_metadata(md_updated, 
+                              maps = not_used, 
+                              type_of_info = type_of_info,
+                              mapset_from = ms_from, 
+                              new_mapset = ms, 
+                              variables = not_used_names, 
+                              institution = NA,
+                              description = NA, 
+                              unit = NA, 
+                              type_data = "raster",
+                              original_range_values = "0, 1", 
                               year_data = NA,
                               original_pixel_res = 30, #??
                               final_pixel_res = 100, 
                               extent = "Norway",
-                              primary_derived = "Primary",
-                              derived_form = NA,
+                              primary_derived = "Resampled",
+                              derived_form = "NORUT land use classes",
                               website = NA, 
                               source = NA, 
                               obtained_through = "NINA", 
@@ -214,13 +244,22 @@ readr::write_csv(md_updated, file = paste0("../data/spatialdb_metadata_oneimpact
 
 #---
 # land use density
-# This data is present in the mapset "g_LandCover_Norway_NORUT_SAM_TT", but it should be recalculated
+# This data is present in the mapset "g_LandCover_Norway_NORUT_SAM_TT", 
+# but it should be recalculated
 # with the data from Sweden
 # But we need to compare the land use maps first
+```
 
+### Elevation for Fennoscandia
+
+```{r copy_landscape_elevation}
 #---
 # elevation, slope, aspect???
+```
 
+### TPI for Fennoscandia
+
+```{r copy_landscape_TPI}
 #---
 # TPI - 50m
 ms_from <- "g_Elevation_Fenoscandia_TPI"
@@ -239,8 +278,12 @@ md_file <- list.files("../data/", pattern = "spatialdb_metadata_oneimpact", full
 md <- readr::read_csv(md_file)
 
 maps
-scales <- purrr::map(strsplit(maps, "_"), ~.[3]) %>% unlist()
+scales <- purrr::map_chr(strsplit(maps, "_"), ~.[3])
 map_names <- paste0("Terrain Position Index: ", scales, "m")
+
+# get min and max from GRASS maps
+min_max <- get_univar(maps, vars = c("min", "max"), all_together = F)
+min_max <- apply(min_max, 1, function(x) paste0("[", paste(round(x, 2), collapse = ", "), "]"))
 
 md_updated <- update_metadata(md, 
                               maps = maps, 
@@ -252,9 +295,9 @@ md_updated <- update_metadata(md,
                               description = NA, 
                               unit = NA, 
                               type_data = "raster",
-                              original_range_values = "ca. -1000-(+1000)", 
+                              original_range_values = min_max, 
                               year_data = NA,
-                              original_pixel_res = "???", #??
+                              original_pixel_res = NA, #??
                               final_pixel_res = 50, 
                               extent = "Fenoscandia",
                               primary_derived = "Derived",
@@ -273,28 +316,137 @@ readr::write_csv(md_updated, file = paste0("../data/spatialdb_metadata_oneimpact
 # system(paste("mv", md_file, "../data/old_metadata"))
 ```
 
-Now we load the landscape datasets from Sweden into GRASS GIS.
+### Digestible biomass
+
+```{r copy_landscape_digbiomass}
+#---
+# Digestible biomass
+ms_from <- "u_bram.van.moorter"
+maps <- execGRASS("g.list", type = "raster", mapset = ms_from, intern = T) %>% 
+  grep(pattern = "digest", value = T)
+
+# copy
+for(i in maps) {
+  map_in <- paste0(i, "@", ms_from)
+  map_out <- i
+  execGRASS("g.region", raster = map_in)
+  execGRASS("g.copy", raster=paste0(map_in, ",", map_out), flags = c("overwrite"))
+}
+
+# document
+md_file <- list.files("../data/", pattern = "spatialdb_metadata_oneimpact", full.names = T)
+md <- readr::read_csv(md_file)
+
+maps
+map_names <- c("Digestible biomass in summer", "Digestible biomass in winter")
+
+# get min and max from GRASS maps
+min_max <- get_univar(maps, vars = c("min", "max"), all_together = F)
+min_max <- apply(min_max, 1, function(x) paste0("[", paste(round(x, 1), collapse = ", "), "]"))
+
+md_updated <- update_metadata(md, 
+                              maps = maps, 
+                              type_of_info = type_of_info,
+                              mapset_from = ms_from, 
+                              new_mapset = ms, 
+                              variables = map_names, 
+                              institution = NA,
+                              description = NA, 
+                              unit = NA, 
+                              type_data = "raster",
+                              original_range_values = min_max, 
+                              year_data = NA,
+                              original_pixel_res = NA, #??
+                              final_pixel_res = 100, 
+                              extent = "Norway",
+                              primary_derived = "Derived",
+                              derived_form = "???",
+                              website = NA, 
+                              source = NA, 
+                              obtained_through = "NINA", 
+                              observations = NA)
+md_updated
+
+# write updated metadata on the disk
+readr::write_csv(md_updated, file = paste0("../data/spatialdb_metadata_oneimpact_",
+                                           gsub("-", "", lubridate::today()),
+                                           ".csv"))
+# put the old metadata file in archive
+# system(paste("mv", md_file, "../data/old_metadata"))
+```
+
+## Data from Sweden
+
+Here we load the landscape datasets from Sweden into GRASS GIS.
+
+### Land use NMD, SMD, and Lichen model
 
 ```{r landscape_sweden}
 # folder
 landscape_dir = paste0(sw_dir, "03_raster/sam_landscape/")
 
-# load vegetation data - NMD - OK
+# load vegetation data - NMD
 execGRASS("r.import", input = paste0(landscape_dir, "landcover_nmd_ungeneralized/nmd2018bas_ogeneraliserad_v1_0.tif"), 
     output = "landcover_sw_nmd1_ungeneralized_10m_2018")
 
-"/data/P-Prosjekter/41203800_oneimpact/sam_raw_sw/02_vector/"
+# load auxiliary vegetation data - SMD
+execGRASS("r.import", input = paste0(landscape_dir, "landcover_smd_generalized_2013/mosaic/smdb99.tif"), 
+    output = "landcover_sw_smd_25m_2004")
 
-# load auxiliary vegetation data - SMD - OK
-r.in_gdal(input = landscape_dir+"landcover_smd_generalized/mosaic/smdb99.tif", 
-    output = "landcover_smd_25m_2004")
+# elevation, aspect, slope, tpi, 10m resampled from 2m - should I add?
 
+# load general lichen map for Sweden - Sven
+execGRASS("r.import", input = paste0(landscape_dir, "lichen_sven/lav_model_south_no_roads_masked.tif"),
+    output = "lichen_model_sw", flags = "overwrite")
+
+# update metadata
+
+# read metadata from Swedish metadata
+md_sw <- readr::read_csv("../data/spatialdb_metadata_sweden_20211101.csv")[1:19]
+# read new metadata file
+md_file <- list.files("../data/", pattern = "spatialdb_metadata_oneimpact", full.names = T)
+md <- readr::read_csv(md_file)
+
+# pattern to search in the Swedish db
+patt <- c("ungeneralized", "smd_25m", "lichen_Sweden")
+
+# find which lines correspond to these maps in the original sweden db
+ind <- purrr::map_int(patt, ~ grep(., md_sw$`Layer name`))
+
+# final map names  
+maps <- c("landcover_sw_nmd1_ungeneralized_10m_2018", "landcover_sw_smd_25m_2004",
+          "lichen_model_sw")
+
+md_updated <- update_metadata_existing(md, maps = maps, indexes = ind, existing_metadata = md_sw)
+md_updated
+
+# write updated metadata on the disk
+readr::write_csv(md_updated, file = paste0("../data/spatialdb_metadata_oneimpact_",
+                                           gsub("-", "", lubridate::today()),
+                                           ".csv"))
+# put the old metadata file in archive
+# system(paste("mv", md_file, "../data/old_metadata"))
 ```
 
+We still need to process some data - doing operations like resampling for a single same resolution, mosaicing maps, calculating densities etc..
 
 # Load species data
 
-Now we import species data
+Now we import species/biotic related data.
+
+## Data from Norway
+
+Here we'll copy the datasets from Norway that have already been in use in the previous projects (e.g. Renewable Reindeer, Prodchange).
+
+```{r}
+
+```
+
+## Data from Sweden
+
+Here we load the landscape datasets from Sweden into GRASS GIS.
+
+### Predators?
 
 ```{r}
 # go into mapset
