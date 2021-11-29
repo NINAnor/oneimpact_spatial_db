@@ -1,0 +1,110 @@
+---
+title: "Update PostGIS database"
+author: ""
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  NinaR::jensAnalysis:
+  highlight: tango
+  fig_caption: yes
+  toc: yes
+---
+  
+  
+```{r load_packages, message = F, warning = F}
+# Load packages
+require(dplyr)
+require(rgrass7)
+require(NinaR)
+
+require(sp)
+require(raster)
+require(terra)
+require(rgdal)
+require(sf)
+
+require(RPostgres)
+require(rpostgis)
+```
+
+
+```{r setup, include=FALSE}
+# This is optional
+# I choose the 'styler' package for tidying the code to preserve indentations
+# I set the cutoff for code tidying to 60, but this doesn't currently work with styler.
+# Set tidy = True to get the knitr default
+# I want all figures as png and pdf in high quality in a subfolder called figure
+
+knitr::opts_chunk$set(
+  eval = FALSE, # do not run anything
+  echo = TRUE,
+  tidy = "styler",
+  dev = c("png", "pdf"),
+  dpi = 600,
+  fig.path = "figure/"
+)
+
+options(
+  xtable.comment = F,
+  xtable.include.rownames = F,
+  nina.logo.y.pos = 0.15
+)
+palette(ninaPalette())
+```
+
+
+```{r, include = T}
+# This connects to the gisdatabase with a DBI connection named `con`.
+# Use for example dbGetQuery(con, "SELECT * FROM ....") to query the database
+source("~/.pgpass")
+
+postgreSQLConnect2 <- function (username = "postgjest", password = "gjestpost", host = "gisdata-db.nina.no", 
+                                dbname = "gisdata", ...) 
+{
+  tmp <- RPostgres::dbConnect(RPostgres::Postgres(), host = host, 
+                              dbname = dbname, user = username, password = password, 
+                              ...)
+  assign("con", tmp, .GlobalEnv)
+}
+
+postgreSQLConnect(
+  host = "gisdata-db.nina.no",
+  dbname = "gisdata",
+  username = pg_username,
+  password = pg_password
+)
+```
+
+```{r connectGRASS}
+# Connect to GRASS
+NinaR::grassConnect(location = "ETRS_33N", mapset = "user")
+
+
+execGRASS("db.login", driver = "pg", database = "gisdata",
+          user = pg_username, password = pg_password, host="gisdata-db.nina.no",
+          flags = "overwrite")
+
+str_con <- paste0("PG:host=gisdata-db.nina.no user=", pg_username, " password=", pg_password, " dbname=gisdata")
+
+rm(pg_username, pg_password)
+
+# example of command
+#execGRASS("g.mapset", parameters = list(), flags = )
+```
+
+```{r connectpostgis}
+execGRASS("db.connect", driver = "pg", database = "gisdata", schema = "sam_env", flags = "p")
+execGRASS("db.tables", flags = "p")
+
+
+layer_use <- paste("sam_env", "public_roads_sw_test", sep = ".")
+
+execGRASS("v.in.ogr", input = "PG:host=gisdata-db.nina.no user=bernardo.brandao password=LolaGalssauro87 dbname=gisdata",
+          layer="AdministrativeUnits.Fenoscandia_Country_polygon", output = "test_fenos_polygon", flags = "overwrite")
+
+execGRASS("v.external", input="PG:host=gisdata-db.nina.no user=bernardo.brandao dbname=gisdata", flags = "l")
+
+execGRASS("v.in.ogr", input = str_con, layer = layer_use, 
+          output = "public_roads_sw_test", flags = "overwrite")
+
+```
+

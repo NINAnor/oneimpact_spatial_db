@@ -48,3 +48,11 @@ However, the variables currently available were created only for the extent of N
 mapsets (e.g. `g_LandCover_Fenoscandia_PHENOLOGY_average` does not exist in the server), or scripts used to create
 them. Maybe we could re-calculate all that for the whole Fennoscandia?  
 [Check that with Knut and Torkild.]
+
+## Industry
+
+- How to set up a good workflow between PostGIS and GRASS?
+
+- First a workflow to upload vector data in PostGIS taking into account:  
+    - special characters
+    - a safest structure for the tables in PostGIS (as suggested in PostGIS in action book)

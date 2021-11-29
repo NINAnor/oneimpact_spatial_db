@@ -21,6 +21,9 @@ require(raster)
 require(terra)
 require(rgdal)
 require(sf)
+
+require(RPostgres)
+require(rpostgis)
 ```
 
 
@@ -54,24 +57,78 @@ palette(ninaPalette())
 # Use for example dbGetQuery(con, "SELECT * FROM ....") to query the database
 source("~/.pgpass")
 
-postgreSQLConnect(
+postgreSQLConnect2 <- function (username = "postgjest", password = "gjestpost", host = "gisdata-db.nina.no", 
+    dbname = "gisdata", ...) 
+{
+    tmp <- RPostgres::dbConnect(RPostgres::Postgres(), host = host, 
+        dbname = dbname, user = username, password = password, 
+        ...)
+    assign("con", tmp, .GlobalEnv)
+}
+
+postgreSQLConnect2(
   host = "gisdata-db.nina.no",
   dbname = "gisdata",
   username = pg_username,
   password = pg_password
 )
 
+# str_con <- paste0("PG:host=gisdata-db.nina.no user=", pg_username, " password=", pg_password, " dbname=gisdata")
+
 rm(pg_username, pg_password)
 ```
+```{r}
+# check PostGIS is installed in the database and functional
+pgPostGIS(con)
 
-# Connect to GRASS GIS
+# list what is available
+pgListGeom(con, geog = TRUE)
+pgListRast(con)
 
-We start by connecting the R session to GRASS GIS, in my local user mapset (`u_bernardo.brandao`).
-
-```{r connectGRASS}
-# Connect to GRASS
-NinaR::grassConnect(location = "ETRS_33N", mapset = "user")
-
-# example of command
-#execGRASS("g.mapset", parameters = list(), flags = )
+st_layers(con, table = c("sam_env"))
 ```
+
+# test read vector and save to sam_env
+
+```{r}
+crs_no <- 25833 #EPSG:25833 (ETRS89/UTM zone 33N)
+
+# Define paths
+
+# root folder Sweden
+sw_dir = "/data/P-Prosjekter/41203800_oneimpact/sam_raw_sw/02_vector/"
+# subdir
+subdir <- "sam_env/"
+
+# sam_env folder
+sam_env <- paste0(sw_dir, subdir)
+
+# list
+vect_files <- list.files(sam_env)
+
+# read
+pub_roads_file <- vect_files %>% grep(pattern = "public_roads", value = T) %>% 
+  grep(pattern = "2020", value = T) %>% 
+  grep(pattern = "gpkg", value = T)
+pub_roads_sw <- sf::st_read(paste0(sam_env, pub_roads_file))
+pub_roads_sw_sp <- sf::st_read(paste0(sam_env, pub_roads_file)) %>% 
+  # dplyr::select(KKOD, VAGNR1, BKLASS) %>% 
+  as("Spatial")
+pub_roads_sw_test <- pub_roads_sw %>% 
+  dplyr::select(KKOD, VAGNR1, BKLASS)
+
+pub_roads_sw_sp %>% str
+
+stringi::stri_enc_toutf8(pub_roads_sw$KATEGORI)
+iconv(pub_roads_sw$KATEGORI, from = 'ASCII//TRANSLIT', to = 'UTF-8')
+
+Encoding(pub_roads_sw$KATEGORI[1])
+
+# write
+pub_roads_sw_test %>% 
+  sf::st_transform(crs = crs_no) %>%
+  sf::st_write(dsn = con, Id(schema="sam_env", table = "public_roads_sw_test"))
+
+pgInsert(con, name = c("sam_env", "public_roads_sw_test"), data.obj = pub_roads_sw_sp, new.id = "pub_road_id")
+```
+
