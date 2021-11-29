@@ -2,6 +2,7 @@
 title: "Questions: spatial db"
 author: "Bernardo Niebuhr"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
+geometry: margin=2cm
 output: 
   NinaR::jensAnalysis:
     highlight: tango
@@ -39,3 +40,11 @@ Or should we use a single map for the whole region (a regional or Europe land us
 - Digestible biomass for Sweden? Should we keep the map for Norway in the database?
 
 
+## Climate and phenology variables
+
+- The phenology variables seem to be available for the whole Fennoscandia  
+(mapsets `g_LandCover_Fenoscandia_PHENELOGY*`).  
+However, the variables currently available were created only for the extent of Norway, and I cannot find the files, 
+mapsets (e.g. `g_LandCover_Fenoscandia_PHENOLOGY_average` does not exist in the server), or scripts used to create
+them. Maybe we could re-calculate all that for the whole Fennoscandia?  
+[Check that with Knut and Torkild.]

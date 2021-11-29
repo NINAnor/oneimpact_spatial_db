@@ -475,7 +475,7 @@ Here we'll copy the datasets from Norway that have already been in use in the pr
 
 ### Climate PCAs from Norway
 
-```{r}
+```{r climate_pcas}
 # go into mapset
 ms <- "p_sam_climate_phenology"
 execGRASS("g.mapset", mapset = ms)
@@ -517,10 +517,12 @@ min_max <- get_univar(maps, vars = c("min", "max"), all_together = F)
 min_max <- apply(min_max, 1, function(x) paste0("[", paste(round(x, 4), collapse = ", "), "]"))
 
 # description
-desc <- paste("PCA axes from climatic variables for Norway, from Bakkestuen, V., Erikstad, L., and Halvorsen, R. (2008).
-Step-less models for regional environmental variation in Norway. Journal of biogeography, 35(10):1906–1922.")
-derived_fr <- paste("Fifty-four climatic, topographical, hydrological and geological. See Bakkestuen et al. (2008) for
-details")
+desc <- paste("PCA axes from climatic variables for Norway, from 
+Bakkestuen, V., Erikstad, L., and Halvorsen, R. (2008).
+Step-less models for regional environmental variation in Norway. 
+Journal of biogeography, 35(10):1906–1922.")
+derived_fr <- paste("Fifty-four climatic, topographical, hydrological and geological. 
+See Bakkestuen et al. (2008) for details")
 
 md_updated <- update_metadata(md, 
                               maps = maps, 
@@ -553,9 +555,35 @@ readr::write_csv(md_updated, file = paste0("../data/spatialdb_metadata_oneimpact
 # system(paste("mv", md_file, "../data/old_metadata"))
 ```
 
+### Phenology variables from Fennoscandia
+
+The phenology variables seem to be available for the whole Fennoscandia (mapsets g_LandCover_Fenoscandia_PHENELOGY*).  
+However, the variables currently available were created only for the extent of Norway, and I cannot find the files, 
+mapsets (e.g. g_LandCover_Fenoscandia_PHENOLOGY_average does not exist in the server), or scripts used to create
+them. Maybe we could re-calculate all that for the whole Fennoscandia?
+
+Check that with Knut and Torkild.
+
 ## Data from Sweden
 
 Here we load the landscape datasets from Sweden into GRASS GIS.
+
+
+
+
+
+
+
+
+# Load species data
+
+Now we import species/biotic related data.
+
+## Data from Norway
+
+Here we'll copy the datasets from Norway that have already been in use in the previous projects (e.g. Renewable Reindeer, Prodchange).
+
+## Data from Sweden
 
 ### Predators?
 
@@ -590,10 +618,3 @@ for(i in file) {
 
 
 
-# Load species data
-
-Now we import species/biotic related data.
-
-## Data from Norway
-
-Here we'll copy the datasets from Norway that have already been in use in the previous projects (e.g. Renewable Reindeer, Prodchange).
