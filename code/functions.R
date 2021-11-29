@@ -57,13 +57,14 @@ update_metadata <- function(md,
   }
   
   if(length(maps) > 1) {
+    if(length(mapset_from) == 1) mapset_from <- rep(mapset_from, length(maps))
     if(length(original_range_values) == 1) original_range_values <- rep(original_range_values, length(maps))
   }
 
   for(i in 1:length(maps)) {
     which_line <- which(md$layer_name == maps[i])
     md$type_of_information[which_line] <- type_of_info
-    md$old_folder[which_line] <- mapset_from
+    md$old_folder[which_line] <- mapset_from[i]
     md$folder[which_line] <- new_mapset
     md$variable[which_line] <- variables[i]
     md$institution[which_line] <- institution

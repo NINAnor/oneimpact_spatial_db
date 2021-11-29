@@ -253,6 +253,14 @@ readr::write_csv(md_updated, file = paste0("../data/spatialdb_metadata_oneimpact
 ### Elevation for Fennoscandia
 
 ```{r copy_landscape_elevation}
+# go into mapset
+ms <- "p_sam_landscape"
+execGRASS("g.mapset", mapset = ms)
+
+#---
+# settings
+type_of_info <- "landscape"
+
 #---
 # elevation, slope, aspect???
 ```
@@ -260,6 +268,14 @@ readr::write_csv(md_updated, file = paste0("../data/spatialdb_metadata_oneimpact
 ### TPI for Fennoscandia
 
 ```{r copy_landscape_TPI}
+# go into mapset
+ms <- "p_sam_landscape"
+execGRASS("g.mapset", mapset = ms)
+
+#---
+# settings
+type_of_info <- "landscape"
+
 #---
 # TPI - 50m
 ms_from <- "g_Elevation_Fenoscandia_TPI"
@@ -319,6 +335,14 @@ readr::write_csv(md_updated, file = paste0("../data/spatialdb_metadata_oneimpact
 ### Digestible biomass
 
 ```{r copy_landscape_digbiomass}
+# go into mapset
+ms <- "p_sam_landscape"
+execGRASS("g.mapset", mapset = ms)
+
+#---
+# settings
+type_of_info <- "landscape"
+
 #---
 # Digestible biomass
 ms_from <- "u_bram.van.moorter"
@@ -382,6 +406,15 @@ Here we load the landscape datasets from Sweden into GRASS GIS.
 ### Land use NMD, SMD, and Lichen model
 
 ```{r landscape_sweden}
+# go into mapset
+ms <- "p_sam_landscape"
+execGRASS("g.mapset", mapset = ms)
+
+#---
+# settings
+type_of_info <- "landscape"
+
+#---
 # folder
 landscape_dir = paste0(sw_dir, "03_raster/sam_landscape/")
 
@@ -430,16 +463,94 @@ readr::write_csv(md_updated, file = paste0("../data/spatialdb_metadata_oneimpact
 
 We still need to process some data - doing operations like resampling for a single same resolution, mosaicing maps, calculating densities etc..
 
-# Load species data
 
-Now we import species/biotic related data.
+
+# Load climate and phenology data
+
+Now we import climate and phenology related data.
 
 ## Data from Norway
 
 Here we'll copy the datasets from Norway that have already been in use in the previous projects (e.g. Renewable Reindeer, Prodchange).
 
-```{r}
+### Climate PCAs from Norway
 
+```{r}
+# go into mapset
+ms <- "p_sam_climate_phenology"
+execGRASS("g.mapset", mapset = ms)
+
+#---
+# settings
+type_of_info <- "climate_phenology"
+
+#---
+# PCAs 1 and 2
+ms_from1 <- "g_BiogeographicalRegions_Norway_PCA_klima"
+maps1 <- execGRASS("g.list", type = "raster", mapset = ms_from1, intern = T) 
+
+# PCAs 3 and 4
+ms_from2 <- "u_bram.van.moorter"
+maps2 <- execGRASS("g.list", type = "raster", mapset = ms_from2, intern = T) %>% 
+  grep(pattern = "klima", value = T)
+
+ms_from <- c(rep(ms_from1, 2), rep(ms_from2, 2))
+maps <- c(maps1, maps2)
+
+# copy
+for(i in 1:length(maps)) {
+  map_in <- paste0(maps[i], "@", ms_from[i])
+  map_out <- maps[i]
+  execGRASS("g.region", raster = map_in)
+  execGRASS("g.copy", raster=paste0(map_in, ",", map_out), flags = c("overwrite"))
+}
+
+# document
+md_file <- list.files("../data/", pattern = "spatialdb_metadata_oneimpact", full.names = T)
+md <- readr::read_csv(md_file)
+
+maps
+map_names <- paste0("Norway climatic PCA", 1:4)
+
+# get min and max from GRASS maps
+min_max <- get_univar(maps, vars = c("min", "max"), all_together = F)
+min_max <- apply(min_max, 1, function(x) paste0("[", paste(round(x, 4), collapse = ", "), "]"))
+
+# description
+desc <- paste("PCA axes from climatic variables for Norway, from Bakkestuen, V., Erikstad, L., and Halvorsen, R. (2008).
+Step-less models for regional environmental variation in Norway. Journal of biogeography, 35(10):1906–1922.")
+derived_fr <- paste("Fifty-four climatic, topographical, hydrological and geological. See Bakkestuen et al. (2008) for
+details")
+
+md_updated <- update_metadata(md, 
+                              maps = maps, 
+                              type_of_info = type_of_info,
+                              mapset_from = ms_from, 
+                              new_mapset = ms, 
+                              variables = map_names, 
+                              institution = NA,
+                              description = desc, 
+                              unit = NA, 
+                              type_data = "raster",
+                              original_range_values = min_max, 
+                              year_data = NA,
+                              original_pixel_res = 1000, #??
+                              final_pixel_res = 100, 
+                              extent = "Norway",
+                              primary_derived = "Derived",
+                              derived_form = derived_fr,
+                              website = NA, 
+                              source = NA, 
+                              obtained_through = "NINA", 
+                              observations = NA)
+md_updated
+
+# write updated metadata on the disk
+readr::write_csv(md_updated, file = paste0("../data/spatialdb_metadata_oneimpact_",
+                                           gsub("-", "", lubridate::today()),
+                                           ".csv"))
+# put the old metadata file in archive
+# system(paste("mv", md_file, "../data/old_metadata"))
 ```
 
 ## Data from Sweden
@@ -477,3 +588,12 @@ for(i in file) {
 
 ```
 
+
+
+# Load species data
+
+Now we import species/biotic related data.
+
+## Data from Norway
+
+Here we'll copy the datasets from Norway that have already been in use in the previous projects (e.g. Renewable Reindeer, Prodchange).

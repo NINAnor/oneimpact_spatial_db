@@ -9,6 +9,12 @@ output:
     toc: yes
 ---
 
+## All variables
+
+- The variables are originally in different resolutions and alignments. Should I process all of them to have
+the same resolution and align them?
+Should I just change the resolution or work on interpolating/resampling them?
+
 ## Landscape variables
 
 - **Variables**: land use/cover classes, elevation and derived (slope, aspect, TPI at multiple scales), 
