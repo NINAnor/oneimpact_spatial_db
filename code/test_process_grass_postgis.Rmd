@@ -96,15 +96,15 @@ execGRASS("db.connect", driver = "pg", database = "gisdata", schema = "sam_env",
 execGRASS("db.tables", flags = "p")
 
 
-layer_use <- paste("sam_env", "public_roads_sw_test", sep = ".")
+layer_use <- paste("sam_env", "public_roads_sw", sep = ".")
 
 execGRASS("v.in.ogr", input = "PG:host=gisdata-db.nina.no user=bernardo.brandao password=LolaGalssauro87 dbname=gisdata",
-          layer="AdministrativeUnits.Fenoscandia_Country_polygon", output = "test_fenos_polygon", flags = "overwrite")
+          layer="sam_env.public_roads_sw", output = "public_roads_sw", flags = "overwrite")
 
 execGRASS("v.external", input="PG:host=gisdata-db.nina.no user=bernardo.brandao dbname=gisdata", flags = "l")
 
 execGRASS("v.in.ogr", input = str_con, layer = layer_use, 
-          output = "public_roads_sw_test", flags = "overwrite")
+          output = "public_roads_sw2", flags = "overwrite")
 
 ```
 

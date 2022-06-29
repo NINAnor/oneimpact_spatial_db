@@ -10,11 +10,19 @@ output:
     toc: yes
 ---
 
-## All variables
+## General questions
 
 - The variables are originally in different resolutions and alignments. Should I process all of them to have
 the same resolution and align them?
 Should I just change the resolution or work on interpolating/resampling them?
+
+- How to deal with spatial temporal variables?
+  - Onset of spring (1y)
+  - Snow depth (1d)
+  - Use GRASS GIS temporal rasters?
+  
+- Keep variables as to make the raster stacks smaller for prediction?
+  
 
 ## Landscape variables
 
@@ -39,6 +47,7 @@ Or should we use a single map for the whole region (a regional or Europe land us
 - Lichen model for Norway?
 - Digestible biomass for Sweden? Should we keep the map for Norway in the database?
 
+- Explore water permanence layers - dam contours in the past
 
 ## Climate and phenology variables
 
@@ -49,10 +58,38 @@ mapsets (e.g. `g_LandCover_Fenoscandia_PHENOLOGY_average` does not exist in the 
 them. Maybe we could re-calculate all that for the whole Fennoscandia?  
 [Check that with Knut and Torkild.]
 
-## Industry
+## Transport and Urban
 
-- How to set up a good workflow between PostGIS and GRASS?
+### Public roads
 
-- First a workflow to upload vector data in PostGIS taking into account:  
-    - special characters
-    - a safest structure for the tables in PostGIS (as suggested in PostGIS in action book)
+- Sweden OK
+- import Norwegian ones to GRASS as vector
+- Rasterize
+
+### Private roads
+
+- Sweden OK
+- import Norwegian ones to GRASS as vector
+- Rasterize
+
+### Railways
+
+- OK, import to GRASS (Swe)
+- where is the dataset for Norway in gisdata?
+- Rasterize
+
+### Houses
+
+- OK, import to GRASS (Swe)
+- How should we deal with that?
+- Rasterize
+
+### Buildings
+
+- OK, import to GRASS (Swe)
+- Paralell in Nor?
+- Rasterize
+
+### Public, private cabins
+
+- How to deal with them in Sweden?

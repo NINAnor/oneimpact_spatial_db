@@ -1,0 +1,189 @@
+---
+title: "OneImpact spatial database documentation"
+author: "Bernardo Niebuhr"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+geometry: margin=2cm
+output: 
+  NinaR::jensAnalysis:
+    highlight: tango
+    fig_caption: yes
+    toc: yes
+---
+
+# Introduction
+
+The spatial database for OneImpact is distributed in two main databases at NINA, the `gisdata` database in
+PostGIS and a GRASS GIS database.
+
+All spatial data was originally or was reprojected to the coordinate reference system EPSG:25833 (Datum ETRS89, UTM zone 33N).
+
+# Support/ancillary layers
+
+### sam_tools
+
+master_grid_1km_norway - how to rename the old ones and the new one?
+
+# Environmental layers
+
+**Add summary table here**
+
+
+## Transport and infrastructure
+
+Vector layers in `gisdata` are located in the `sam_env` schema. Vector and raster layers in the GRASS database are
+located in the `p_sam_transport_urban` mapset.
+
+### Public roads
+
+- Sweden Imported: Layer "Almäna vagar" from Omvärdlsfaktorer
+- import Norwegian ones to GRASS as vector
+- in RenRein data has been edited for 3 areas with local information about when the roads were
+open or closed on winter and summer (calving will be treated as winter or summer depending on the layer);
+this is why in the GRASS GIS database there are summer and winter layers
+- are public roads considered closed?
+- Rasterize
+- 1 layer (public and private, calving?, summer and winter)
+
+### Private roads
+
+- Sweden OK
+- import Norwegian ones to GRASS as vector
+- are private roads considered closed?
+- Rasterize
+
+### Railways
+
+- OK, import to GRASS (Swe)
+- where is the dataset for Norway in gisdata? Take directly from N50
+- Rasterize
+
+### Houses
+
+- OK, import to GRASS (Swe)
+- How should we deal with that?
+- Rasterize
+
+### Buildings
+
+- OK, import to GRASS (Swe)
+- Paralell in Nor?
+- Rasterize
+
+
+### Urban areas? Are they collections of houses?
+
+## Industry
+
+### Industrial buildings
+
+- Sw?
+
+### Wind power
+
+- Wind turbines SW ok
+- Wind turbines Norge NVE?
+- Wind parks?
+- Check with Manu's layer which she edited manually
+
+### Mining areas
+
+- Swe OK
+- Norge?
+
+### Power lines
+
+- Sw
+- Nor
+
+### Reservoirs?
+
+- 
+
+## Tourism
+
+### Public cabins
+
+- How to deal with them in Sweden?
+
+### Private cabins
+
+### Snow scooter
+
+### Snow mobile tracks Sw
+
+### Trails
+
+- Nor: tourist_trails and marked_tourist_trails; motor trails?
+- Sw:
+
+### Climate and phenology
+
+### Norwegian PCA - not useful when we take Sweden into account
+
+### Bioclimatic variables?
+
+### NDVI
+
+Check if there are products for whole Scandinavia
+Torkild, Stefan
+
+- The phenology variables seem to be available for the whole Fennoscandia  
+(mapsets `g_LandCover_Fenoscandia_PHENELOGY*`).  
+However, the variables currently available were created only for the extent of Norway, and I cannot find the files, 
+mapsets (e.g. `g_LandCover_Fenoscandia_PHENOLOGY_average` does not exist in the server), or scripts used to create
+them. Maybe we could re-calculate all that for the whole Fennoscandia?  
+[Check that with Knut and Torkild.]
+
+
+Norway: fit curve to NDVI
+- Onset of spring (just that, without changes) - for calving, summer, sometimes even  
+- Average
+- Beck...
+- Bishof
+
+### Snow
+
+- Length of snow season (based on MODIS data)
+- Snow depth (model, interpolated from meteorological stations)
+- Stefan Blumentrath - is there something with Scandinavian coverage?
+
+## Landscape variables
+
+### Lakes
+
+### Elevation
+
+### Slope, aspect, TPI, terrain rugedness
+
+### Land cover
+
+### Lichen abundance
+
+- abundance, presence?
+- digestible biomass?
+
+- **General question: should I resample everything with is not 100m to 100m?**
+
+- Where should I get the elevation (dem, slope, aspect) from, for Norway? g_Elevation_Fenoscandia?
+
+- g_Elevation_Fenoscandia_TPI: all maps with 50m. Should I resample them to 100m?
+Should I calculate it for more window sizes? so far, 250, 500, 1000, 2500, 5000, 10000
+
+- Elevation for Sweden: we used a 10m res map, derived from a 2m res. But we have available maps for the whole
+Fenoscandia. Should we use this one?
+
+- How to match land use classes from maps from Sweden and Norway? 
+Or should we use a single map for the whole region (a regional or Europe land use map)?
+
+- Lichen model for Norway?
+- Hans Tømmervick
+- Digestible biomass for Sweden? Should we keep the map for Norway in the database?
+
+- Explore water permanence layers - dam contours in the past
+
+## Climate and phenology variables
+
+
+#############
+
+NORUT-SatVeg are the same map

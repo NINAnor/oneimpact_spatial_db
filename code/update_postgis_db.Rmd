@@ -1,30 +1,13 @@
 ---
-title: "Update PostGIS database"
-author: ""
+title: "Update PostGIS database for OneImpact and reindeer ecology projects"
+author: "Bernardo Niebuhr"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: 
+output:
   NinaR::jensAnalysis:
     highlight: tango
     fig_caption: yes
     toc: yes
 ---
-  
-  
-```{r load_packages, message = F, warning = F}
-# Load packages
-require(dplyr)
-require(rgrass7)
-require(NinaR)
-
-require(sp)
-require(raster)
-require(terra)
-require(rgdal)
-require(sf)
-
-require(RPostgres)
-require(rpostgis)
-```
 
 
 ```{r setup, include=FALSE}
@@ -33,6 +16,8 @@ require(rpostgis)
 # I set the cutoff for code tidying to 60, but this doesn't currently work with styler.
 # Set tidy = True to get the knitr default
 # I want all figures as png and pdf in high quality in a subfolder called figure
+library(knitr)
+library(NinaR)
 
 knitr::opts_chunk$set(
   eval = FALSE, # do not run anything
@@ -51,22 +36,30 @@ options(
 palette(ninaPalette())
 ```
 
+```{r load_packages, message = F, warning = F}
+# Load packages
+require(dplyr)
+require(rgrass7)
+require(NinaR)
 
-```{r, include = F, eval = F}
+require(sp)
+require(raster)
+require(terra)
+require(rgdal)
+require(sf)
+library(stringi)
+
+require(RPostgres)
+require(rpostgis)
+```
+
+```{r connectPG_and_parms, include = F, eval = F}
 # This connects to the gisdatabase with a DBI connection named `con`.
 # Use for example dbGetQuery(con, "SELECT * FROM ....") to query the database
+
 source("~/.pgpass")
 
-postgreSQLConnect2 <- function (username = "postgjest", password = "gjestpost", host = "gisdata-db.nina.no", 
-    dbname = "gisdata", ...) 
-{
-    tmp <- RPostgres::dbConnect(RPostgres::Postgres(), host = host, 
-        dbname = dbname, user = username, password = password, 
-        ...)
-    assign("con", tmp, .GlobalEnv)
-}
-
-postgreSQLConnect2(
+NinaR::postgreSQLConnect(
   host = "gisdata-db.nina.no",
   dbname = "gisdata",
   username = pg_username,
@@ -76,8 +69,12 @@ postgreSQLConnect2(
 # str_con <- paste0("PG:host=gisdata-db.nina.no user=", pg_username, " password=", pg_password, " dbname=gisdata")
 
 rm(pg_username, pg_password)
+
+# CRS to be used
+crs_no <- 25833 #EPSG:25833 (ETRS89/UTM zone 33N)
 ```
-```{r}
+
+```{r check_postgis}
 # check PostGIS is installed in the database and functional
 pgPostGIS(con)
 
@@ -88,47 +85,1492 @@ pgListRast(con)
 st_layers(con, table = c("sam_env"))
 ```
 
-# test read vector and save to sam_env
+```{r create_new_schema_env, eval=FALSE}
+# move the old schema to archive - only the owner (Bram) can do that
+res <- DBI::dbSendQuery(con, "ALTER SCHEMA sam_env RENAME TO sam_env_archive_may2022;")
+DBI::dbFetch(res)
+DB::dbClearResult(res)
 
-```{r}
+# create new schema
+DBI::dbExecute(con, "CREATE SCHEMA IF NOT EXISTS sam_env;")
+DBI::dbSendQuery(con, "COMMENT ON SCHEMA sam_env IS 'Contains refined environmental layers for both Norway and Sweden'")
+# DBI::dbSendQuery(con, "COMMENT ON SCHEMA sam_env IS 'Contains refined environmental layers for both Norway and Sweden'")
+
+# grant authorizations
+users <- c("bram.van.moorter", "manuela.panzacchi", "torkild.tveraa", "knut.langeland")
+for (i in users) {
+  qq <- paste0('GRANT ALL ON SCHEMA sam_env TO "', i, '";')
+  print(qq)
+  DBI::dbExecute(con, qq)
+}
+
+users <- c("bram.van.moorter", "manuela.panzacchi", "torkild.tveraa", "knut.langeland")
+for (i in users) {
+  qq <- paste0('GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA sam_env TO "', i, '";')
+  print(qq)
+  DBI::dbExecute(con, qq)
+}
+```
+
+```{r create_new_schema_trein_sweden, eval=FALSE}
+# create new schemas for semi-domesticated reindeer in Sweden
+# main - GPS data
+DBI::dbExecute(con, "CREATE SCHEMA IF NOT EXISTS sam_trein_se_main;")
+DBI::dbExecute(con, "COMMENT ON SCHEMA sam_trein_se_main IS 'GPS data of tamrein in Sweden'")
+
+# ancillary data
+DBI::dbExecute(con, "CREATE SCHEMA IF NOT EXISTS sam_trein_se_ancillary;")
+DBI::dbExecute(con, "COMMENT ON SCHEMA sam_trein_se_ancillary IS 'Constains ancillary data on tamrein in Sweden'")
+
+# grant authorizations
+users <- c("bram.van.moorter", "manuela.panzacchi", "torkild.tveraa", "knut.langeland")
+schemas <- c("sam_trein_se_main", "sam_trein_se_ancillary")
+for (i in users) {
+  for(s in schemas) {
+    qq <- paste0('GRANT ALL ON SCHEMA ', s, ' TO "', i, '";')
+    print(qq)
+    DBI::dbExecute(con, qq)
+  }
+}
+
+for (i in users) {
+  for(s in schemas) {
+    qq <- paste0('GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA ', s, ' TO "', i, '";')
+    print(qq)
+    DBI::dbExecute(con, qq)
+  }
+}
+```
+
+```{r create_new_schema_sam_env_sweden_raw, eval=FALSE}
+# create new schema for raw environmental layers in Sweden
+# main - GPS data
+DBI::dbExecute(con, "CREATE SCHEMA IF NOT EXISTS sam_env_se_raw;")
+DBI::dbExecute(con, "COMMENT ON SCHEMA sam_env_se_raw IS 'Raw environmental data from Sweden'")
+
+# grant authorizations
+users <- c("bram.van.moorter", "manuela.panzacchi", "torkild.tveraa", "knut.langeland")
+schemas <- c("sam_env_se_raw")
+for (i in users) {
+  for(s in schemas) {
+    qq <- paste0('GRANT ALL ON SCHEMA ', s, ' TO "', i, '";')
+    print(qq)
+    DBI::dbExecute(con, qq)
+  }
+}
+
+for (i in users) {
+  for(s in schemas) {
+    qq <- paste0('GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA ', s, ' TO "', i, '";')
+    print(qq)
+    DBI::dbExecute(con, qq)
+  }
+}
+```
+
+# Ancillary files
+
+## National limits - sam_tools
+
+```{r national_limits}
+# load national limits to use below
+pgListGeom(con) %>%
+  dplyr::filter(schema_name == "AdministrativeUnits")
+
+# check
+nat_lim <- sf::st_read(dsn = con, Id(schema = "AdministrativeUnits", table = "Fenoscandia_NUTS_RG_01M_2013"))
+se_lim <- nat_lim %>% filter(nuts_id == "SE")
+no_lim <- nat_lim %>% filter(nuts_id == "NO")
+
+#---
+# perform filter in PostGIS
+
+# norway
+map <- "\"AdministrativeUnits\".\"Fenoscandia_NUTS_RG_01M_2013\""
+conditions <- c("(nuts_id) = 'NO'")
+out_map <- "sam_tools.norway_limits"
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS ", out_map," AS 
+SELECT
+*
+FROM ",
+    map,
+" WHERE ", 
+    paste(conditions, collapse = "AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE", out_map, "IS 'Norway boundaries, query:", 
+                          gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+
+# sweden
+conditions <- c("(nuts_id) = 'SE'")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_tools.sweden_limits AS 
+SELECT
+*
+FROM
+    \"AdministrativeUnits\".\"Fenoscandia_NUTS_RG_01M_2013\"
+WHERE ", 
+    paste(conditions, collapse = "AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_tools.sweden_limits IS 'Swedish boundaries, query:", 
+                          gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+## Master grid - sam_tools
+
+```{r master_grid_no}
+crs_no <- 25833 #EPSG:25833 (ETRS89/UTM zone 33N)
+
+# root files
+grid_file_1km = "/data/R/GeoSpatialData/Population_demography/Norway_SSB/Processed/master_grid_1km.tif"
+grid_file_100m = "/data/R/GeoSpatialData/Population_demography/Norway_SSB/Processed/master_grid_100m.tif"
+
+# read files
+grid_1km <- terra::rast(grid_file_1km)
+grid_100m <- terra::rast(grid_file_100m)
+
+# convert to points
+grid_1km_sp <- grid_1km %>% 
+  as.data.frame(xy = TRUE) %>% 
+  dplyr::rename(points_id = 3) %>% 
+  sf::st_as_sf(coords = c("x", "y"), crs = crs_no) %>% 
+  as("Spatial")
+
+grid_100m_sf <- grid_100m %>% 
+  as.data.frame(xy = TRUE) %>% 
+  dplyr::rename(points_id = 3) %>% 
+  sf::st_as_sf(coords = c("x", "y"), crs = crs_no)
+
+# write to PostGIS
+pgInsert(con, name = c("sam_tools", "master_grid_1km_norway"),
+         data.obj = grid_1km_sp,
+         new.id = "fid", overwrite = TRUE)
+
+comm <- paste("COMMENT ON TABLE sam_tools.master_grid_1km_norway IS ", 
+              "'Master grid vector with 1km resolution for Norway,", 
+              "created as the center point from the cells of the raster map:", 
+              grid_file_1km, "';")
+comm
+DBI::dbExecute(con, comm)
+
+# too big for pgInsert, using st_write
+grid_100m_sf %>%
+  sf::st_write(dsn = con, Id(schema = "sam_tools", table = "master_grid_100m_norway"))
+
+comm <- paste("COMMENT ON TABLE sam_tools.master_grid_100m_norway IS ", 
+              "'Master grid vector with 100m resolution for Norway,", 
+              "created as the center point from the cells of the raster map:", 
+              grid_file_100m, "';")
+
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+## Swedish Sami reindeer herding districts - sam_trein_se_ancillary
+
+```{r sameby_se}
 crs_no <- 25833 #EPSG:25833 (ETRS89/UTM zone 33N)
 
 # Define paths
 
 # root folder Sweden
-sw_dir = "/data/P-Prosjekter/41203800_oneimpact/sam_raw_sw/02_vector/"
-# subdir
-subdir <- "sam_env/"
-
-# sam_env folder
-sam_env <- paste0(sw_dir, subdir)
+se_dir = "/data/P-Prosjekter/41203800_oneimpact/sam_raw_se/02_vector/sam_reindeer_ancillary/"
 
 # list
-vect_files <- list.files(sam_env)
+vect_files <- list.files(se_dir, full.names = TRUE)
 
 # read
-pub_roads_file <- vect_files %>% grep(pattern = "public_roads", value = T) %>% 
-  grep(pattern = "2020", value = T) %>% 
+sameby_se_file <- vect_files %>% grep(pattern = "DBO_sameby", value = T) %>%
   grep(pattern = "gpkg", value = T)
-pub_roads_sw <- sf::st_read(paste0(sam_env, pub_roads_file))
-pub_roads_sw_sp <- sf::st_read(paste0(sam_env, pub_roads_file)) %>% 
-  # dplyr::select(KKOD, VAGNR1, BKLASS) %>% 
-  as("Spatial")
-pub_roads_sw_test <- pub_roads_sw %>% 
-  dplyr::select(KKOD, VAGNR1, BKLASS)
-
-pub_roads_sw_sp %>% str
-
-stringi::stri_enc_toutf8(pub_roads_sw$KATEGORI)
-iconv(pub_roads_sw$KATEGORI, from = 'ASCII//TRANSLIT', to = 'UTF-8')
-
-Encoding(pub_roads_sw$KATEGORI[1])
+sameby_se <- sf::st_read(sameby_se_file,
+                         options = "ENCODING=windows-1252") %>%
+  dplyr::mutate(NAMN = stri_trans_general(NAMN, "Latin-ASCII"))
+sameby_se <- sameby_se %>%
+  sf::st_transform(crs = crs_no)
 
 # write
-pub_roads_sw_test %>% 
-  sf::st_transform(crs = crs_no) %>%
-  sf::st_write(dsn = con, Id(schema="sam_env", table = "public_roads_sw_test"))
+sameby_se %>%
+  sf::st_write(dsn = con, Id(schema = "sam_trein_se_ancillary", table = "herding_districts_se"))
 
-pgInsert(con, name = c("sam_env", "public_roads_sw_test"), data.obj = pub_roads_sw_sp, new.id = "pub_road_id")
+comm <- paste("COMMENT ON TABLE sam_trein_se_ancillary.herding_districts_se IS 'Sami reindeer herding districts (sameby) in Sweden, from IRENMARK, retrieved from RenGIS and stored at:", se_dir, "';")
+comm
+DBI::dbSendQuery(con, comm)
+
+# Samebyar to be used in OneImpact
+map <- "sam_trein_se_ancillary.herding_districts_se"
+sameby_oneimpact <- c("Mittadalen", "Tassasen", "Njaarke", "Vilhelmina sodra", 
+                      "Vilhelmina norra", "Mala", "Mausjaur", "Udtja",
+                      "Gallivare", "Sirges", "Handolsdalen")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_trein_se_ancillary.herding_districts_se_oneimpact AS
+SELECT
+*
+FROM ",
+    map,
+" WHERE 
+    \"NAMN\" IN ('", paste0(sameby_oneimpact, collapse = "','"),"');", sep = "") %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_trein_se_ancillary.herding_districts_se_oneimpact IS 'Subset of Sami reindeer herding districts (sameby) in Sweden used in OneImpact, query:", 
+              gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+
+# Reindeer herding area
+se_lim <- sf::st_read(con, Id(schema = "sam_tools", table = "sweden_limits")) %>% 
+  sf::st_transform(crs_no)
+se_lim
+plot(se_lim[1])
+
+sameby_se_union <- sameby_se %>% 
+  sf::st_buffer(dist = 20000) %>% 
+  sf::st_union() %>% 
+  sf::st_intersection(y = se_lim)
+
+# write
+sameby_se_union %>%
+  sf::st_write(dsn = con, Id(schema = "sam_trein_se_ancillary", table = "herding_districts_se_union"))
+
+comm <- paste("COMMENT ON TABLE sam_trein_se_ancillary.herding_districts_se_union IS 'Merged (single) vector feature of Sami reindeer herding districts (sameby) in Sweden, with a 20km buffer in the South of the reindeer herding area.';")
+comm
+DBI::dbSendQuery(con, comm)
 ```
 
+## Norwegian Sami reindeer herding districts - replace
+
+```{r sameby_no}
+map <- "sam_trein_main.herding_districts_2012"
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_trein_ancillary.herding_districts_no_2012 AS 
+SELECT
+*
+FROM ",
+    map) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_trein_ancillary.herding_districts_no_2012 IS", 
+              "'Sami reindeer herding districts in Norway, from kilden.nibio.no - reindrift'")
+comm
+DBI::dbSendQuery(con, comm)
+
+# remove from old schema- main
+# DBI::dbExecute(con, "DROP TABLE sam_trein_main.herding_districts_2012")
+```
+
+
+# Transport and urban infrastructure
+
+## Roads - public and private - Sweden
+
+```{r roads_se}
+crs_no <- 25833 #EPSG:25833 (ETRS89/UTM zone 33N)
+
+# Define paths
+# root folder Sweden
+se_dir = "/data/P-Prosjekter/41203800_oneimpact/sam_raw_se/02_vector/sam_env/"
+
+# list
+vect_files <- list.files(se_dir)
+
+# Public (large) roads
+
+# read
+pub_roads_file <- vect_files %>% grep(pattern = "public_roads", value = T) %>%
+  grep(pattern = "2020", value = T) %>%
+  grep(pattern = "shp", value = T)
+pub_roads_se <- sf::st_read(paste0(se_dir, pub_roads_file),
+                            options = "ENCODING=windows-1252") %>%
+  dplyr::mutate(KATEGORI = stri_trans_general(KATEGORI, "Latin-ASCII"))
+
+# write
+pub_roads_se %>%
+  sf::st_transform(crs = crs_no) %>%
+  sf::st_write(dsn = con, Id(schema = "sam_env", table = "roads_public_Vindval_se"))
+
+comm <- paste("COMMENT ON TABLE sam_env.\"roads_public_Vindval_se\" IS 'Public (large) roads (Allmanna vagar) in Sweden, from Swedish Vagkartan from Lantmateriet in EPSG:3006, converted to EPSG:25883; originally in extracted from RenGIS Omvarldsfaktorer 2020 and stored at:", se_dir, "; Added to PostGIS in", lubridate::today(),"';")
+comm
+DBI::dbSendQuery(con, comm)
+
+# Private (small) roads
+
+# read
+priv_roads_file <- vect_files %>% grep(pattern = "private_roads", value = T) %>%
+  grep(pattern = "2020", value = T) %>%
+  grep(pattern = "shp", value = T)
+priv_roads_se <- sf::st_read(paste0(se_dir, priv_roads_file),
+                             options = "ENCODING=windows-1252") %>%
+  dplyr::mutate(KATEGORI = stri_trans_general(KATEGORI, "Latin-ASCII"))
+
+# write
+priv_roads_se %>%
+  sf::st_transform(crs = crs_no) %>%
+  sf::st_write(dsn = con, Id(schema = "sam_env", table = "roads_private_Vindval_se"))
+
+comm <- paste("COMMENT ON TABLE sam_env.\"roads_private_Vindval_se\" IS 'Private (small) roads (Ovriga vagar) in Sweden, from Swedish Vagkartan from Lantmateriet in EPSG:3006, converted to EPSG:25883; originally in extracted from RenGIS Omvarldsfaktorer 2020 and stored at:", se_dir, "; Added to PostGIS in", lubridate::today(),"';")
+comm
+DBI::dbSendQuery(con, comm)
+
+#-------
+# explore layers
+
+# codes already included
+sort(unique(pub_roads_se$KKOD))
+sort(unique(priv_roads_se$KKOD))
+
+# to add as public:
+# 5011 (Motorvag, riksvag)
+# 5012 (Motortrafikled - main arterial road, riksvag)
+# 5016 and 5017 (Motorvag and Motortrafikled, ej riksväg)
+# not 5018 (Allmän väg under byggnad, riksväg - not open for traffic, could be consider for construction activity, but it is not relevant for reindeer)
+# 5033 (På- och avfartsväg; entry and exit roads, roundabouts and connections to roads, mainly in urban areas)
+# 5036 (same as 5033 for national roads)
+# 5040 (Gata, urban streets) - for compatibility in OneImpact
+# 5045 (Gata, större, gatumitt; large streets in urban areas) - for compatibility in OneImpact
+# 5811, 5812, 5816, 5817: should be kept out from both layers, they are in tunnels and should not strongly affect; but keep as public for consistency
+# 5828 (roads in tunnels, just small segments - equivalent to 5028)
+# 5833 and 5836 (entry andexit roads in tunnels)
+
+#--------
+# public roads
+
+# re-query public roads
+public_codes <- c('5011', '5012', '5016', '2017', # main roads not included in Omvarldsfaktorer
+                  '5021', '5022', '5024', '5025', '5028', '5029', # already in Omvarldsfaktorer
+                  '5033', '5036', '5040', '5045', # entry and exit roads and urban large streets, not included in Omvarldsfaktorer
+                  '5811', '5812', '5816', '2817', # main roads in tunnels not included in Omvarldsfaktorer
+                  '5821', '5822', '5824', '5825', '5828', '5829', # already in Omvarldsfaktorer, except 5028
+                  '5833', '5836', '5840', '5845') # entry and exit roads and urban large streets in tunnels, not included in Omvarldsfaktorer
+
+conditions <- paste0("\"KKOD\" IN ('", paste(public_codes, collapse = "','"),"')")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.roads_public_se AS 
+SELECT
+    *
+FROM
+    \"Topography\".\"Sweden_Vagkartan_Roads_lines\"
+WHERE 
+", paste(conditions, collapse = "AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.roads_public_se IS 'Public (large) roads in Sweden, from Swedish Vagkartan from Lantmateriet in EPSG:3006, converted to EPSG:25883, downloaded and added to PostGIS in 2016; it includes main roads and main streets in urban areas; query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+
+#--------
+# private roads
+
+# Main categories:
+# 5061, 5861: Better class road - Bättre bilväg (open, in tunnels)
+# 5071, 5871: Road - Bilväg (open, in tunnels)
+# 5082, 5882: Poorer class road - Sämre bilväg (open, in tunnels)
+# 5091, 5891: Approach road - Uppfartsväg (open, in tunnels)
+
+# 5082, 5071: maybe closed part of the year? check complete description
+# classification is not consisten, come 5071 have 5082 in the middle - it is better not to make a difference
+# 5071 also includes many urban streets (but 5082 don't)
+
+# re-query public roads
+private_codes <- c("5061", "5071", "5082", "5091",
+                   "5861", "5871", "5882", "5891") # exluded big roads and urban streets, compared to Omvarldsfaktorer
+
+conditions <- paste0("\"KKOD\" IN ('", paste(private_codes, collapse = "','"),"')")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.roads_private_se AS 
+SELECT
+    *
+FROM
+    \"Topography\".\"Sweden_Vagkartan_Roads_lines\"
+WHERE 
+", paste(conditions, collapse = "AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.roads_private_se IS 'Private (small) roads in Sweden, from Swedish Vagkartan from Lantmateriet in EPSG:3006, converted to EPSG:25883, downloaded and added to PostGIS in 2016; it excludes main roads and main streets in urban areas; query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+## Roads - Norway
+
+```{r roads_no}
+# copy roads layer used in renrein from old sam_env schema, separating into 
+# public and private
+
+# all
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.roads_all_renrein_no AS 
+TABLE sam_env_archive_may2022.renrein_roads;") %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.roads_all_renrein_no IS 'Public and private roads in Norway, extracted from Elveg 2.0; public roads correspond to Vegkategorie = E,R,F,K (or Vegklasse = 0,1,2,3,4,5,6) and private roads to Vegkategorie = P,S (or Vegklasse = 7,8,9); for some areas columns were added with information on summer and winter roads, during RenewableReindeer project.';")
+comm
+DBI::dbSendQuery(con, comm)
+
+#------------
+# public only
+conditions <- c("\"publ_priv\" = 'publ'")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.roads_public_renrein_no AS 
+SELECT
+*
+FROM
+    sam_env_archive_may2022.renrein_roads
+WHERE 
+", paste(conditions, collapse = "AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.roads_public_renrein_no IS 'Public roads in Norway, extracted from Elveg 2.0; public roads correspond to Vegkategorie = E,R,F,K (or Vegklasse = 0,1,2,3,4,5,6); for some areas columns were added with information on summer and winter roads, during RenewableReindeer project.';")
+comm
+DBI::dbSendQuery(con, comm)
+
+#------------
+# private only
+conditions <- c("\"publ_priv\" = 'priv'")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.roads_private_renrein_no AS 
+SELECT
+*
+FROM
+    sam_env_archive_may2022.renrein_roads
+WHERE 
+", paste(conditions, collapse = "AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.roads_private_renrein_no IS 'Private roads in Norway, extracted from Elveg 2.0; private roads correspond to Vegkategorie = P,S (or Vegklasse = 7,8,9); for some areas columns were added with information on summer and winter roads, during RenewableReindeer project.';")
+comm
+DBI::dbSendQuery(con, comm)
+
+```
+
+## Railways - Sweden
+
+```{r railways_se}
+# Define paths
+
+# root folder Sweden
+se_dir = "/data/P-Prosjekter/41203800_oneimpact/sam_raw_se/02_vector/sam_env/"
+
+# list
+vect_files <- list.files(se_dir)
+
+# read
+railways_file <- vect_files %>% grep(pattern = "railways", value = T) %>%
+  grep(pattern = "2020", value = T) %>%
+  grep(pattern = "shp", value = T)
+railways_se <- sf::st_read(paste0(se_dir, railways_file),
+                             options = "ENCODING=windows-1252") %>%
+  dplyr::mutate(KATEGORI = stri_trans_general(KATEGORI, "Latin-ASCII"))
+
+# write
+railways_se %>%
+  sf::st_transform(crs = crs_no) %>%
+  sf::st_write(dsn = con, Id(schema = "sam_env", table = "railways_se"))
+
+comm <- paste("COMMENT ON TABLE sam_env.railways_se IS 'Railways (Jarnvagar) in Sweden, from Swedish Vagkartan from Lantmateriet in EPSG:3006, converted to EPSG:25883; originally in extracted from RenGIS Omvarldsfaktorer 2020 and stored at:", se_dir, "; Added to PostGIS in", lubridate::today(),"';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+## Railways - Norway
+
+```{r railway_no}
+# copy roads layer used in renrein from old sam_env schema
+conditions <- c("\"objtype\" = 'Bane'", "\"medium\" = 'T'")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.railways_no AS 
+SELECT
+*
+FROM
+    n50_2013_utm33n.n50_2013_samferdsel_lines
+WHERE 
+", paste(conditions, collapse = "AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.railways_no IS 'Railways in Norway, query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+## Houses - Sweden
+
+130-132, 133, 135, 199
+133 includes hotels but also many buildings with apartments, so we keep it
+
+```{r houses_se}
+# Houses in Sweden
+
+# Classes:
+# 130: Residential, Small house, detached
+# Small house with a dwelling that is not connected to another small house.
+# 131: Residential, Small house, chain linked house
+# Two or more single family houses joined via a garage, storeroom or similar. Each home is on private property; semi-detached houses are also classified as chain linked houses.
+# 132: Residential, Single family houses, terraced houses
+# Small houses in a row of at least three houses whose dwelling parts are directly joined with each other and where each dwelling is on private property.
+# 133: Residential, Multi-family house
+# Building with at least three dwellings. May sometimes contain an office, shop, hotel, restaurant or similar. At least 50% must be residential.
+# 135: Residential, Small house with several apartments
+# Small house with several apartments that are on the same property. E.g. two residential houses, rental or tenant-owned, with at least three apartments.
+# 199: Residential, Unspecified
+# Home with unknown residential purposes. Stated only by Lantmäteriet when using updating methods that cannot determine the purpose.
+
+conditions <- c("\"DETALJTYP\" = 'HUS'", 
+                "\"ANDAMAL_1\" IN ('130', '131', '132', '133', '135', '199')")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.houses_se AS 
+SELECT
+*
+FROM
+    \"Topography\".\"Sweden_Fastighetskartan_Buildings_polygons\"
+WHERE 
+", paste(conditions, collapse = "AND "), ";") %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+# earlier we used data from RenGIS/Omvarldsfaktorer 2020, but we are going into more details now
+# crs_no <- 25833 #EPSG:25833 (ETRS89/UTM zone 33N)
+# 
+# # Define paths
+# # root folder Sweden
+# se_dir = "/data/P-Prosjekter/41203800_oneimpact/sam_raw_se/02_vector/sam_env/"
+# 
+# # list
+# vect_files <- list.files(se_dir)
+# 
+# houses_file <- vect_files %>% grep(pattern = "houses", value = T) %>%
+#   grep(pattern = "2020", value = T) %>%
+#   grep(pattern = "shp", value = T)
+# houses_se <- sf::st_read(paste0(se_dir, houses_file),
+#                          options = "ENCODING=windows-1252")
+# 
+# # write
+# houses_se %>%
+#   sf::st_transform(crs = crs_no) %>%
+#   sf::st_write(dsn = con, Id(schema = "sam_env", table = "houses_se"))
+
+comm <- paste("COMMENT ON TABLE sam_env.houses_se IS 'Houses in Sweden, from Fastighetskartan 2016 [from Lantmateriet in EPSG:3006, converted to EPSG:25883 and added to PostGIS in 2016]; query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+
+# DBI::dbSendQuery(con, "DROP TABLE sam_env.houses_se")
+
+# check
+houses_se <- sf::st_read(con, Id(schema = "sam_env", table = "houses_se"))
+```
+
+## Houses and urban - Norway
+
+### Urban areas
+
+Here we keep only a temporary file to be merged with point representation of houses.
+
+```{r urban_areas_no}
+# urban areas in Norway
+# TettBebyggelse: continuous, developed area (predominantly residential) where 
+# the buildings, for the most part, are closer than 50 metres apart
+# BymessigBebyggelse: city block (town centre) with a large element of shops and 
+# service buildings. Note: The buildings have predominantly two or more storeys.
+conditions <- c("\"objtype\" = 'TettBebyggelse'", # house agglomerates
+                "\"objtype\" = 'BymessigBebyggelse'") # downtown, center
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_tmp.tmp_urban_no AS 
+SELECT
+*
+FROM
+    n50_2013_utm33n.n50_2013_arealdekke_polygons
+WHERE 
+", paste(conditions, collapse = " OR ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_tmp.tmp_urban_no IS 'Urban areas (polygons) in Norway, query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+
+# DBI::dbExecute(con, "DROP TABLE sam_env.tmp_urban_no")
+```
+
+### Houses
+
+Here we keep only a temporary file to be merged with polygon urban areas, for a final
+layer of houses and urban areas.
+We keep all buildings from N50 for which byggtyp_nbr < 161, but we exclude those features
+which overlap with urban areas (defined above).
+
+```{r houses_no}
+# houses in No
+conditions <- c("(objtype) = 'Bygning'",
+                "(byggtyp_nbr) < '161'")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_tmp.tmp_houses_all_no AS 
+SELECT
+*
+FROM
+    n50_2013_utm33n.n50_2013_byggoganlegg_points
+WHERE 
+", paste(conditions, collapse = " AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_tmp.tmp_houses_all_no IS 'Houses (all) in Norway, query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+
+# Houses not overlapping with urban areas
+conditions <- c("ST_Within(n50_2013_utm33n.n50_2013_byggoganlegg_points.the_geom, sam_env.tmp_urban_no.the_geom)")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_tmp.tmp_houses_not_urban_no AS 
+SELECT
+    houses.*
+FROM
+    sam_tmp.tmp_houses_all_no AS houses
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM sam_tmp.tmp_urban_no AS urban
+    WHERE ST_Within(houses.geom, urban.geom)
+);") %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_tmp.tmp_houses_not_urban_no IS 'Houses not overlapping with urban polygons in Norway, query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+Then we rasterize them (see the script `build_grass_db.Rmd`) and merge both urban
+and houses in a single layer, since they complement each other.
+
+Possibility: use building from the CadastralParcels bygning layer, which is complete with
+all houses and buildings.
+
+# Landscape data
+
+## Lakes - Norway
+
+**Must remove reservoirs from here!**
+Should a simple `st_difference` be enough? Are the databases consistent or there will be small errors from that?
+It seems there are some delimitations for that in N50, but there might be errors if the databases are different 
+(N50 for lakes and NVE for reservoirs)
+
+```{r lakes_no}
+# lakes in Norway
+map <- "n50_2013_utm33n.n50_2013_arealdekke_polygons"
+conditions <- c("\"objtype\" = 'Innsjø'")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.lakes_no AS 
+SELECT
+*
+FROM ",
+    map,
+" WHERE ", 
+    paste(conditions, collapse = "AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.lakes_no IS 'Lakes in Norway, query:", 
+              gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+# Industrial infrastructure
+
+## Industrial areas - Norway
+
+```{r industrial_areas_no}
+# industrial areas in Norway
+# developed or undeveloped, used for industrial purposes. Also includes installations for water supply, waste handling and cleaning, as well as power plants, transformer substation, etc.
+map <- "n50_2013_utm33n.n50_2013_arealdekke_polygons"
+conditions <- c("\"objtype\" = 'Industriområde'")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_tmp.tmp_industrial_areas_no AS 
+SELECT
+*
+FROM ",
+    map,
+" WHERE ", 
+    paste(conditions, collapse = " AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_tmp.tmp_industrial_areas_no IS 'Industrial areas in Norway, extracted from N50; query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+Buildings for farming/cattle, boats?
+These do not overlap with industrial areas above
+
+```{r industrial_buildings_no}
+# test industrial buildings in Norway
+map <- "n50_2013_utm33n.n50_2013_byggoganlegg_points"
+conditions <- c("(objtype) = 'Bygning'",
+                "(byggtyp_nbr) IN ('211', '212', '214', '216', '219', '221', '223', '229')") 
+# 211: Factory building, building for industrial series production.
+# 212: Workshop building, Building for special production or repair
+# 214: Building for treatment plant, i.a. sewage pumping station
+# 216: Building for water supply, i.a. pumping station.
+# 219: Other industrial building, or building that is closely connected to / serves such and similar building (s)
+# 221: Power station
+# 223: Transformer drive
+# 229: Other energy supply building, or building that is closely connected to / serves such and similar building (s)
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_tmp.tmp_industrial_buildings_no AS 
+SELECT
+*
+FROM ",
+    map,
+" WHERE ", 
+    paste(conditions, collapse = " AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_tmp.tmp_industrial_buildings_no IS 'Industrial buildings in Norway, extracted from N50; query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+## Industrial buildings (polygons) - Sweden
+
+Codes 240-250, 252-253, 299, 304, 315 
+excluding 251 which includes wind turbines themselves, 
+
+```{r industrial_areas_se}
+# industrial areas in Sweden
+
+# classes
+# 240: Industrial, Other manufacturing industry
+# Building for other industrial activities involving manufacturing.
+# 241: Industrial, Gas turbine plant
+# Facilities for production of electricity using combustion gases.
+# 242: Industrial, Industry hotel
+# Building that contains several different industries. E.g. industrial building.
+# 243: Industrial, Chemical industry
+# Industry for the manufacture or processing of chemical products. 
+# E.g. paint industry, plastics industry, pharmaceuticals industry.
+# 244: Industrial, Condensing power plant
+# Facilities for the production of electricity from steam; does not utilise waste heat.
+# 245: Industrial, Nuclear power station
+# Facilities for the production of electricity from nuclear energy.
+# 246: Industrial, Food industry
+# Industry for the production of food, by the processing of agricultural 
+# products among other things. E.g. processed meats, canning industry, fruit industry.
+# 247: Industrial, Metal or machinery industry
+# Industry for the production and processing of metals and machinery. E.g. 
+# car industry, iron works, mechanical industry, metal industry, shipbuilding.
+# 248: Industrial, Textile industry
+# Industry that manufactures yarn, cloth etc. and prepares these. E.g. textile and clothing, weaving.
+# 249: Industrial, Wood industry
+# Industries for processing wood raw materials. E.g. wood, pulp and paper and 
+# furniture industries, paper mill, sawmill, carpentry.
+# 250: Industrial, Water power facilities
+# Facility that converts potential energy of water into electricity.
+# 251: Industrial, Wind turbine
+# Facility for the conversion of wind energy into electricity.
+# 252: Industrial, Heat plant
+# Facility that delivers district heating from boilers that burn solid, liquid or gaseous fuels and consume electricity. E.g. combined heat and power facilities or district heating facilities.
+# 253: Industrial, Other industrial building
+# Other building for industrial activities (possibly without walls) not involving manufacturing, e.g. warehouse, petrol station, repair workshop.
+# 304: Public, Distribution building
+# Building for distribution networks for gas, heating, electricity or water. E.g. transformer station, district heating plant, cabinet (telecommunications, broadband), water tower, grid station.
+# 315: Public, Sewage treatment plant
+# Building for the treatment of waste water.
+
+conditions <- c("\"DETALJTYP\" = 'HUSÖVR'", 
+                "\"ANDAMAL_1\" IN ('240', '241', '242', '243', '244', '245', '246', '247', '248', '249', '250', '252', '253', '299', '304', '315')")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.industrial_buildings_se AS 
+SELECT
+*
+FROM
+    \"Topography\".\"Sweden_Fastighetskartan_Buildings_polygons\"
+WHERE 
+", paste(conditions, collapse = "AND "), ";") %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.industrial_buildings_se IS 'Industrial buildings in Sweden, from Fastighetskartan 2016 [from Lantmateriet in EPSG:3006, converted to EPSG:25883 and added to PostGIS in 2016]; query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+## Wind power - Sweden
+
+## Wind power - Norway
+
+```{r wind_power_no}
+# Wind power in Norway
+
+
+
+
+## OLD and NOT UPDATED dataset
+# power plant which following the wind’s energy to produce electric power
+map <- "n50_2013_utm33n.n50_2013_byggoganlegg_points"
+conditions <- c("\"objtype\" = 'Vindkraftverk'")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.test_wind_parks_no AS 
+SELECT
+*
+FROM ",
+    map,
+" WHERE ", 
+    paste(conditions, collapse = "AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.test_wind_parks_no IS 'Industrial areas in Norway, query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+
+## Mining areas - Sweden
+
+```{r mining_se}
+crs_no <- 25833 #EPSG:25833 (ETRS89/UTM zone 33N)
+
+# Define paths
+# root folder Sweden
+se_dir = "/data/P-Prosjekter/41203800_oneimpact/sam_raw_se/02_vector/sam_env/"
+
+# list
+vect_files <- list.files(se_dir)
+
+# Public (large) roads
+
+# read
+mining_file <- vect_files %>% grep(pattern = "mining", value = T) %>%
+  grep(pattern = "2020", value = T) %>%
+  grep(pattern = "shp", value = T)
+mining_se <- sf::st_read(paste0(se_dir, mining_file),
+                     options = "ENCODING=windows-1252") %>%
+  dplyr::mutate(KATEGORI = stri_trans_general(KATEGORI, "Latin-ASCII"))
+
+# write
+mining_se %>%
+  sf::st_transform(crs = crs_no) %>%
+  sf::st_write(dsn = con, Id(schema = "sam_env", table = "mining_se"))
+
+comm <- paste("COMMENT ON TABLE sam_env.power_lines_se IS 'Power lines in Sweden, from Vagkartan, extracted from RenGIS and stored at:", se_dir, "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+## Mining related - Norway?
+
+## Streintipp, Steinbrudd
+
+```{r mining_areas_no}
+# test mining areas and dam structures in Norway
+
+# Steintipp
+# permanent mass disposal that is not forested and is dominant in the landscape (and the like made in connection with mining or watercourse development)
+
+# Steinbrudd
+# dagbrudd for uttak av malm, skifer, sand, grus og pukk.
+# area for stone quarry. Land use boundary is used as delimitation.
+conditions <- c("\"objtype\" = 'Steintipp'",
+                "\"objtype\" = 'Steinbrudd'")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.test_mining_and_dams_no AS 
+SELECT
+*
+FROM
+    n50_2013_utm33n.n50_2013_arealdekke_polygons
+WHERE 
+", paste(conditions, collapse = " OR ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.test_mining_and_dams_no IS 'Mining areas in Norway, query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+# DBI::dbExecute(con, "DROP TABLE sam_env.test_mining_and_dams_no")
+```
+
+These will be ignored:
+
+```{r mining_points_no}
+# Mining points
+
+# Gruve: tunnel or system of blasted tunnels in solid rock where the tunnel entrance is clear and from which ore or minerals are extracted, or have been extracted
+# Criteria:
+# All objects that satisfy the definition are sought to be included.
+# Mine does not include quarries (open pit mines).
+map <- "n50_2013_utm33n.n50_2013_byggoganlegg_points"
+conditions <- c("\"objtype\" = 'Gruve'")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_tmp.tmp_mining_points_no AS 
+SELECT
+*
+FROM ",
+    map,
+" WHERE ", 
+    paste(conditions, collapse = " OR ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_tmp.tmp_mining_points_no IS 'Points with mining tunnels in Norway, extracted from N 50; query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+# Comment: does not seem to be relevant, there are several points
+# isolated from anything else
+```
+
+## Power lines - Sweden
+
+```{r power_lines_se}
+crs_no <- 25833 #EPSG:25833 (ETRS89/UTM zone 33N)
+
+# Define paths
+# root folder Sweden
+se_dir = "/data/P-Prosjekter/41203800_oneimpact/sam_raw_se/02_vector/sam_env/"
+
+# list
+vect_files <- list.files(se_dir)
+
+# Public (large) roads
+
+# read
+pl_file <- vect_files %>% grep(pattern = "power_lines", value = T) %>%
+  grep(pattern = "2020", value = T) %>%
+  grep(pattern = "shp", value = T)
+pl_se <- sf::st_read(paste0(se_dir, pl_file),
+                     options = "ENCODING=windows-1252") %>%
+  dplyr::mutate(KATEGORI = stri_trans_general(KATEGORI, "Latin-ASCII"))
+
+# write
+pl_se %>%
+  sf::st_transform(crs = crs_no) %>%
+  sf::st_write(dsn = con, Id(schema = "sam_env", table = "power_lines_se"))
+
+comm <- paste("COMMENT ON TABLE sam_env.power_lines_se IS 'Powerlines (Kraftledningar) in Sweden, from Swedish Vagkartan from Lantmateriet in EPSG:3006, converted to EPSG:25883; originally in extracted from RenGIS Omvarldsfaktorer 2020 and stored at:", se_dir, "; Added to PostGIS in", lubridate::today(),"';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+## Power lines - Norway
+
+```{r power_lines_no}
+# LuftledningLH: line conducting electrical power over large distances and where it is uncertain whether there is a low-voltage or high-voltage line.
+# Criteria:
+# Prominent power lines longer than 500 m are sought to be included.
+# Shorter lines are also included where these are considered important, for example when crossing rivers and fjords. Line spans longer than 100 m and higher than 60 m above ground level are coded as Cable.
+# Power lines in and around buildings can be omitted.
+
+# Ledning: Transmission line in air for transmission of electric power over fjords and valleys.
+# Criteria:
+# Power line with free span longer than 100 m and higher than 60 m above ground level. As many of the lines as possible are included, but there must be a minimum distance between the lines of 50 meters.
+map <- "n50_2013_utm33n.n50_2013_byggoganlegg_lines"
+conditions <- c("\"objtype\" IN ('LuftledningLH', 'Ledning')")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.power_lines_no AS 
+SELECT
+*
+FROM ",
+    map,
+" WHERE ", 
+    paste(conditions, collapse = " OR ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.power_lines_no IS 'Power lines in Norway, extracted from N50; query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+# Tourism infrastructure
+
+# Sweden raw data
+
+```{r vagkartan_se_raw}
+crs_no <- 25833 #EPSG:25833 (ETRS89/UTM zone 33N)
+
+# Define paths
+# root folder Sweden
+se_dir = "/data/P-Prosjekter/41203800_oneimpact/sam_raw_se/02_vector/sam_env/GSD-Vagkartan_vektor/Sverige/Sweref_99_TM/shape/"
+
+# list
+vect_files <- list.files(se_dir)
+
+houses_file <- vect_files %>% grep(pattern = "houses", value = T) %>%
+  grep(pattern = "2020", value = T) %>%
+  grep(pattern = "shp", value = T)
+houses_se <- sf::st_read(paste0(se_dir, houses_file),
+                         options = "ENCODING=windows-1252")
+
+# write
+houses_se %>%
+  sf::st_transform(crs = crs_no) %>%
+  sf::st_write(dsn = con, Id(schema = "sam_env", table = "houses_se"))
+
+comm <- paste("COMMENT ON TABLE sam_env.houses_se IS 'Houses in Sweden, from Fastighetskartan, extracted from RenGIS and stored at:", se_dir, "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+
+## Hotels and resorts - Norway
+
+Larger building for accommodation, approved according to the Hotel Act.
+511
+
+Motel building
+Actually motor hotel, most often located along a main thoroughfare. Approved as a motel according to the Hotel Act. Often smaller one or two storey buildings for accommodation (at least 4 rooms and 10 beds). Differs from regular hotels in that it is not regular room service.
+512
+
+Other hotel building
+Other building for accommodation - approved according to the Hotel Act. , or a building that is closely connected to / serves such and similar building (s).
+519
+
+Remove hotels closer than a certain distance to urban areas?
+500m? 1 km? more?
+
+```{r hotels_no}
+# private cabins in No
+
+# 511: Hotellbygning, Larger building for accommodation, approved according to the Hotel Act.
+# 522: Hiking, holiday home, Hostel, holiday home / colony, tourist cabin.
+# Hostels - affordable night accommodation, often linked to membership in an association.
+# Holiday home / colony: A place with the purpose of providing children with a 
+#healthy and invigorating holiday stay and the opportunity for outdoor life in company with other children.
+# Tourist cabin: Original tourist station, mountain lodge, shuttle station, 
+# often combined with other industries such as farms or inns. Also used for cabins 
+# connected to the tourist association's trail network, where most are serviced, 
+# but also some unattended cabins.
+# 523: Appartement, Building with holiday homes / homes for rent, the homes have 
+# bathrooms and cooking facilities, and are most often rented on a daily or weekly 
+# basis. Modern varieties are often associated with a central expedition with 
+# business and occasionally a restaurant. Originally based on having bedding and 
+# cooking yourself. The dwellings are registered with room code A (other than dwelling). 
+# No usable area for housing must be registered.
+conditions <- c("(objtype) = 'Bygning'",
+                "(byggtyp_nbr) IN ('511', '522', '523')")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.hotels_no AS 
+SELECT
+*
+FROM
+    n50_2013_utm33n.n50_2013_byggoganlegg_points
+WHERE 
+", paste(conditions, collapse = " AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.hotels_no IS 'Hotels, holiday homes, tourist cabins in Norway, extracted from N50; query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+## Private cabins
+
+Is this different from the private_cabins layer we had earlier?
+
+522
+Hiking, holiday home
+Hostel, holiday home / colony, tourist cabin
+Hostels - affordable night accommodation, often linked to membership in an association.
+Holiday home / colony: A place with the purpose of providing children with a healthy and invigorating holiday stay and the opportunity for outdoor life in company with other children.
+Tourist cabin: Original tourist station, mountain lodge, shuttle station, often combined with other industries such as farms or inns. Also used for cabins connected to the tourist association's trail network, where most are serviced, but also some unattended cabins. Tourist cabins are in N50 Map data coded to building type code 956.
+
+171
+Seterhus, sel, rorbu og lignende
+Seterhus, sel, rorbu og lignende
+Rorbu, hus for fiskere til bruk under de store sesongfiskerier.
+(farming houses, not used for recreation)
+
+172 Used by Sami
+Skogs- og utmarkskoie, gamme
+Skogs- og utmarkskoie, primitiv hytte brukt av jegere og
+tømmerhuggere.
+Gamme, jordhytte, særlig brukt av samer.
+
+Forest and outfield hut, old
+Forest and outfield hut, primitive cottage used by hunters and
+lumberjacks.
+Gamme, earth hut, especially used by Sami.
+
+199
+Other residential building (secondary housing reindeer husbandry)
+Other residential building / secondary housing (and similar secondary housing reindeer husbandry)
+
+Does not seem to be general, present everywhere
+
+```{r private_cabins_no}
+# test private cabins in No
+conditions <- c("(objtype) = 'Bygning'",
+                "(byggtyp_nbr) IN ('161', '162', '163')")
+# removed 171 because it is not related to recreation/tourism
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.private_cabins_no AS 
+SELECT
+*
+FROM
+    n50_2013_utm33n.n50_2013_byggoganlegg_points
+WHERE 
+", paste(conditions, collapse = " AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.private_cabins_no IS 'Private cabins in Norway, extracted from N50; query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+```{r private_cabins_tests_no}
+# test hostels/colony/hytte in No
+conditions <- c("(objtype) = 'Bygning'",
+                "(byggtyp_nbr) IN ('522')")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.hostel_colony_no AS 
+SELECT
+*
+FROM
+    n50_2013_utm33n.n50_2013_byggoganlegg_points
+WHERE 
+", paste(conditions, collapse = " AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.hostel_colony_no IS 'Hostels, colonies or hytte in Norway, query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+
+# test Sami houses in No
+conditions <- c("(objtype) = 'Bygning'",
+                "(byggtyp_nbr) IN ('172', '199')")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.Sami_huts_no AS 
+SELECT
+*
+FROM
+    n50_2013_utm33n.n50_2013_byggoganlegg_points
+WHERE 
+", paste(conditions, collapse = " AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.Sami_huts_no IS 'Sami huts in Norway, query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+### Private cabins - Sweden
+
+```{r private_cabins_se}
+# test private cabins in No
+conditions <- c("(objtype) = 'Bygning'",
+                "(byggtyp_nbr) IN ('161', '162', '163')")
+# removed 171 because it is not related to recreation/tourism
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.private_cabins_no AS 
+SELECT
+*
+FROM
+    n50_2013_utm33n.n50_2013_byggoganlegg_points
+WHERE 
+", paste(conditions, collapse = " AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.private_cabins_no IS 'Private cabins in Norway, extracted from N50; query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+```{r mountain_hotels_se}
+# test private cabins in No
+conditions <- c("\"KKOD\" IN ('9931')")
+# removed 171 because it is not related to recreation/tourism
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.tmp_mountain_hotel_se AS 
+SELECT
+*
+FROM
+    \"Topography\".\"Sweden_Fjallinformation_MountainSymbols_points\"
+WHERE 
+", paste(conditions, collapse = " AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.tmp_mountain_hotel_se IS 'Mountain lodges, hotels, and boarding houses in Sweden, extracted from Fjellinformation 2016 [from Lantmateriet in EPSG:3006, converted to EPSG:25883 and added to PostGIS in 2016]; query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+```{r huts_se}
+# test private cabins in No
+conditions <- c("\"KKOD\" IN ('9932', '9933', '9934', '9935')")
+# removed 171 because it is not related to recreation/tourism
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.tmp_huts_se AS 
+SELECT
+*
+FROM
+    \"Topography\".\"Sweden_Fjallinformation_MountainSymbols_points\"
+WHERE 
+", paste(conditions, collapse = " AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.tmp_huts_se IS 'Tourist huts and overnight huts, other huts, rest shelters and hostels, holiday cottages in Sweden, extracted from Fjellinformation 2016 [from Lantmateriet in EPSG:3006, converted to EPSG:25883 and added to PostGIS in 2016]; query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+```{r marked_trails_se}
+# test private cabins in No
+conditions <- c("\"KKOD\" IN ('9932', '9933', '9934', '9935')")
+# removed 171 because it is not related to recreation/tourism
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.tmp_huts_se AS 
+SELECT
+*
+FROM
+    \"Topography\".\"Sweden_Fjallinformation_MountainSymbols_points\"
+WHERE 
+", paste(conditions, collapse = " AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.tmp_huts_se IS 'Tourist huts and overnight huts, other huts, rest shelters and hostels, holiday cottages in Sweden, extracted from Fjellinformation 2016 [from Lantmateriet in EPSG:3006, converted to EPSG:25883 and added to PostGIS in 2016]; query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+## Public cabins
+
+Self-service
+Self-catering cottage with provisions for sale. Can have a cabin guard in high season and the like. May be closed for use part of the year.
+S
+
+Unattended
+Unserviced cottage without provisions. The beds must have mattresses and the cottage must be equipped with an oven, firewood and cooking utensils.
+U
+
+B Officer
+Serviced cottage that is open and serves dinner (usually three courses with coffee) and breakfast in summer and usually also in winter. No opportunities to prepare your own food.
+
+Is the data used in RenRein different from that simple query?
+
+```{r public_cabins_no}
+# test public cabins in Norway - large
+conditions <- c("(objtype) = 'Bygning'",
+                "(byggtyp_nbr) IN ('956')",
+                "(betjening) = 'B'")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.public_cabins_large_no AS 
+SELECT
+*
+FROM
+    n50_2013_utm33n.n50_2013_byggoganlegg_points
+WHERE 
+", paste(conditions, collapse = " AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.public_cabins_large_no IS 'Large public cabins in Norway, which have services (betjent), query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+
+# test public cabins in Norway - medium
+conditions <- c("(objtype) = 'Bygning'",
+                "(byggtyp_nbr) IN ('956')",
+                "(betjening) = 'U'")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.public_cabins_medium_no AS 
+SELECT
+*
+FROM
+    n50_2013_utm33n.n50_2013_byggoganlegg_points
+WHERE 
+", paste(conditions, collapse = " AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.public_cabins_medium_no IS 'Medium public cabins in Norway, with no services (ubetjent), query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+
+# test public cabins in Norway - small
+conditions <- c("(objtype) = 'Bygning'",
+                "(byggtyp_nbr) IN ('956')",
+                "(betjening) = 'S'")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.public_cabins_small_no AS 
+SELECT
+*
+FROM
+    n50_2013_utm33n.n50_2013_byggoganlegg_points
+WHERE 
+", paste(conditions, collapse = " AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.public_cabins_small_no IS 'Small public cabins in Norway, with self-service (selvbetjent), query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+```
+
+## Camping - Norway
+
+Appartement
+Building with holiday homes / homes for rent, the homes have bathrooms and cooking facilities, and are most often rented on a daily or weekly basis. Modern varieties are often associated with a central expedition with business and occasionally a restaurant. Originally based on having bedding and cooking yourself. The dwellings are registered with room code A (other than dwelling). No usable area for housing must be registered
+523
+Merge to hotels and 522
+
+Camping/utleiehytte
+Campinghytte: 
+Camping cabin: A simpler overnight cabin preferably intended for car tourists. As a rule, they are attached to a campsite. Guests usually keep bed linen themselves.
+Rental cottage: A small house with a high, medium or low standard, for temporary stays. Usually larger and better standard than a camping cabin, often not located on a campsite, but more scattered in the terrain. Modern rental cabins often have a high standard and several are often connected to a center with security, kiosk / business and other facilities.
+524
+
+```{r}
+# test camping areas in Norway
+conditions <- c("\"objtype\" = 'Campingplass'")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.test_camping_no AS 
+SELECT
+*
+FROM
+    n50_2013_utm33n.n50_2013_byggoganlegg_points
+WHERE 
+", paste(conditions, collapse = " OR ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.test_camping_no IS 'Camping areas in Norway, query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+
+# DBI::dbExecute(con, "DROP TABLE sam_env.test_urban")
+
+# test camping areas - points in Norway
+conditions <- c("(objtype) = 'Bygning'",
+                "(byggtyp_nbr) IN ('523', '524')")
+
+query1 <- paste0(
+"CREATE TABLE IF NOT EXISTS sam_env.test_camping2_no AS 
+SELECT
+*
+FROM
+    n50_2013_utm33n.n50_2013_byggoganlegg_points
+WHERE 
+", paste(conditions, collapse = " AND ")) %>% 
+  strwrap(width = 1e4, simplify = TRUE)
+query1
+DBI::dbExecute(con, query1)
+
+comm <- paste("COMMENT ON TABLE sam_env.test_camping2_no IS 'Camping areas 2 in Norway, query:", gsub("'", replacement = "\"", query1), "';")
+comm
+DBI::dbSendQuery(con, comm)
+
+# DBI::dbExecute(con, "DROP TABLE sam_env.test_urban")
+
+```
+
+## Camping Sweden
+
+Sweden_Fastighetskartan_FacilitiesOrAreas_other_polygons
+DETALTYP = 'ANLOMR' AND FUNKTION = 'Campingplats'
+
+## Trails
+
+Is the data used in RenRein different from that simple query?
+
+Tourist trails
+Marked tourist trails?
+
+# Other stuff
+
+- Hoppbakke (jumping ski structures) in n50_2013_utm33n.n50_2013_byggoganlegg_points
+- Skitrekk (cableway for pulling skiers up steep slopes) in n50_2013_utm33n.n50_2013_byggoganlegg_lines
+
+- Lysløype (trail with lights) in n50_2013_utm33n.n50_2013_byggoganlegg_lines
+
+- MastTele (mast with radio and telecommunication equipment for sending /receiving telecommunications signals) in n50_2013_utm33n.n50_2013_byggoganlegg_points
+- Tårn (Tall building structure in which the height is great in relation to the footprint of the building, tower with solid construction used for TV, radio or telecommunications, lookout tower, water tower, detached chimney or similar) in n50_2013_utm33n.n50_2013_byggoganlegg_points
+
+- Reingjerde (fences for reindeer herding) in n50_2013_utm33n.n50_2013_byggoganlegg_lines

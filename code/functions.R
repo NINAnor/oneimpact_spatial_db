@@ -8,25 +8,41 @@ gr_g_list <- function(flags = NULL, parms = NULL, mapset = NULL, pre = "", ...) 
 
 # function to benchmark different approaches for neighborhood analysis
 # bna = benchmark  for neighborhood analysis
+# rectangular/box windows
 bna <- function(input_map_grass, input_map_r, size_m, size_pixels, unit = "s", quiet = TRUE, ...) {
   # flags
   flg <- if(quiet) c("overwrite", "quiet") else "overwrite"
+  
+  mat_name <- "zoi_rect_1000.txt"
+  mat <- oneimpact::create_filter(cabins, zoi_radius = size_m,
+                                  type = "rectangle",
+                                  normalize = T, 
+                                  # divisor = 21*21,
+                                  save_txt = TRUE,
+                                  save_file = mat_name, parallel = T)
   
   microbenchmark(
     "r.resamp.filter" = {
       execGRASS("r.resamp.filter",
                 parameters = list(input = input_map_grass, output = paste0("rsp_filter_", input_map_grass, "_", size_m),
-                                  filter = "bartlett", radius = size_m),
+                                  filter = "box", radius = size_m),
                 flags = flg)
     },
     "r.neighbors" = {
       execGRASS("r.neighbors", 
                 parameters = list(input = input_map_grass, output = paste0("neighbors_", input_map_grass, "_", size_m),
                                   method = "average", size = size_pixels),
-                flags = c("c", flg))
+                flags = c(flg))
+    },
+    "r.mfilter" = {
+      execGRASS("r.mfilter", 
+                parameters = list(input = input_map_grass, output = paste0("mfilter_", input_map_grass, "_", size_m),
+                                  filter = mat_name),
+                flags = c(flg))
     },
     "focal in terra" = {
-      terra_focal <- terra::focal(input_map_r, w = size_pixels, fun = "mean")
+      terra_focal <- terra::focal(input_map_r, w = size_pixels, fun = "mean",
+                                  na.policy = "omit", na.rm = TRUE)
       names(terra_focal) <- paste0("focal_", input_map_grass, "_", size_m)
     }, unit = unit, ...)#,
   # "focal in raster" = {

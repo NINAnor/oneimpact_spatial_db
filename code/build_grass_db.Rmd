@@ -10,30 +10,14 @@ output:
     toc: yes
 ---
 
-
-```{r load_packages, message = F, warning = F}
-# Load packages
-require(dplyr)
-require(purrr)
-require(readr)
-require(NinaR)
-
-require(rgrass7)
-require(sp)
-require(raster)
-require(terra)
-require(rgdal)
-require(sf)
-
-source("functions.R")
-```
-
 ```{r setup, include=FALSE}
 # This is optional
 # I choose the 'styler' package for tidying the code to preserve indentations
 # I set the cutoff for code tidying to 60, but this doesn't currently work with styler.
 # Set tidy = True to get the knitr default
 # I want all figures as png and pdf in high quality in a subfolder called figure
+require(knitr)
+require(NinaR)
 
 knitr::opts_chunk$set(
   eval = FALSE, # do not run anything
@@ -52,7 +36,27 @@ options(
 palette(ninaPalette())
 ```
 
-# Connect to GRASS GIS
+```{r load_packages, message = F, warning = F}
+# Load packages
+require(dplyr)
+require(purrr)
+require(readr)
+require(NinaR)
+
+require(rgrass7)
+require(terra)
+require(rgdal)
+require(sf)
+
+require(oneimpact)
+
+require(RPostgres)
+require(rpostgis)
+
+source("functions.R")
+```
+
+# Connect to GRASS GIS and PostGIS
 
 We start by connecting the R session to GRASS GIS, in my local user mapset (`u_bernardo.brandao`).
 
@@ -64,6 +68,28 @@ NinaR::grassConnect(location = "ETRS_33N", mapset = "user")
 #execGRASS("g.mapset", parameters = list(), flags = )
 ```
 
+We also connect to the `gisdata` PostGIS database.
+
+```{r connectpostgis}
+source("~/.pgpass")
+
+postgreSQLConnect(
+  host = "gisdata-db.nina.no",
+  dbname = "gisdata",
+  username = pg_username,
+  password = pg_password
+)
+
+# check
+con
+pgPostGIS(con)
+
+# make string to link to PostGIS data in data importing to GRASS
+str_con <- paste0("PG:host=gisdata-db.nina.no user=", pg_username, " password=", pg_password, " dbname=gisdata")
+
+# remove stored username and password
+rm(pg_username, pg_password)
+```
 
 # Get read access to the existing mapsets
 
@@ -106,24 +132,32 @@ all_relevant_mapsets <- c(mapsets_rein, mapsets_pc,
 execGRASS("g.mapsets", parameters = list(mapset = all_relevant_mapsets))
 ```
 
+# Mapset organization
 
-# Create new mapsets
+We organized the environmental layers in six main mapsets, to store and process maps related to
+different themes:
 
-Let's create the new mapsets here. There are six mapsets:
+- `sam_climate_phenology`: maps related to climate (e.g. temperature, precipitation, snow, 
+bioclim variables or Norwegian PCAs) and phenology (e.g. NDVI)
+- `sam_landscape`: maps related to land use and land cover (e.g. land cover, forestry, deforestation)
+- `sam_species` (should we call it `animals` or `biotic interactions`?): maps related to the influence or
+interaction with other species (e.g. domesticated species, predators, competitors)
+- `sam_industry`: maps related to industrial activity (e.g. wind power development, mining)
+- `sam_transport_urban`: maps related to transport (e.g. roads, railways) and 
+urban infrastructure (e.g. urban areas)
+- `sam_tourism`: maps related to touristic activity (e.g. private cottages, public cabins, trails)
 
-- `climate_phenology`
-- `landscape`
-- `species`
-- `industr`
-- `transport_urban`
-- `urban`
+Besides, there is another one for ancillary files:
 
-Describe the idea of each one here.
+- `sam_tools`: maps not related to environmental layers (e.g. grid of 100m across Norway, management areas, 
+herding districts)
+
+## Create mapsets
 
 ```{r create_mapsets}
 # Create mapsets
 mapsets <- c("climate_phenology", "landscape", "species", 
-             "industry", "transport_urban", "tourism")
+             "industry", "transport_urban", "tourism", "tools")
 mapsets <- paste0("p_sam_", mapsets)
 
 for(ms in mapsets) {
@@ -131,20 +165,106 @@ for(ms in mapsets) {
 }
 ```
 
-# Load data
+# Ancillary data
 
-Before starting to load data, we define here some paths to the folders where the datasets are located. 
-If it is necessary, one can simply change the path and re-load the data.
+## Limits (national, Sami herding districts, management areas)
 
-```{r paths}
-# Define paths
+```{r}
+# go into mapset
+ms <- "p_sam_tools"
+execGRASS("g.mapset", mapset = ms)
 
-# root folder Sweden
-sw_dir = "/data/P-Prosjekter/41203800_oneimpact/sam_raw_sw/"
+crs_no <- 25833 #EPSG:25833 (ETRS89/UTM zone 33N)
+
+# national limits
+
+# norway
+gisdata_schema <- "sam_tools"
+layer_name <- "norway_limits"
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+# import
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+
+# sweden
+gisdata_schema <- "sam_tools"
+layer_name <- "sweden_limits"
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+# import
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+
+# Sami herding districts
+
+# norway
+gisdata_schema <- "sam_trein_ancillary"
+layer_name <- "herding_districts_no_2012"
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+# import
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+
+# sweden
+gisdata_schema <- "sam_trein_se_ancillary"
+layer_name <- "herding_districts_se"
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+# import
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+
+gisdata_schema <- "sam_trein_se_ancillary"
+layer_name <- "herding_districts_se_union"
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+# import
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+
+# Wild reindeer management areas Norway
+
+# official
+gisdata_schema <- "sam_wrein_ancillary"
+layer_name <- "reindeer_areas_official"
+
+# read to R and reproject - it is currently in SWEREF99
+reindeer_areas_official <- sf::st_read(con, Id(schema = gisdata_schema, 
+                                               table = layer_name)) %>% 
+  sf::st_transform(crs = crs_no) %>% 
+  terra::vect()
+
+# import to GRASS
+rgrass7::write_VECT(reindeer_areas_official, "reindeer_areas_official_no")
+
+# used in reindeer projects (renrein, prodchange)
+gisdata_schema <- "sam_wrein_ancillary"
+layer_name <- "reindeer_areas"
+
+# read to R and reproject - it is currently in UTM 32N
+reindeer_areas <- sf::st_read(con, Id(schema = gisdata_schema, 
+                                      table = layer_name)) %>% 
+  sf::st_transform(crs = crs_no) %>%
+  terra::vect()
+
+# import to GRASS
+rgrass7::write_VECT(reindeer_areas, "reindeer_areas_no")
 ```
 
+## Master grid for Norway
 
-# Load landscape data
+```{r master_grid}
+# go into mapset
+ms <- "p_sam_tools"
+execGRASS("g.mapset", mapset = ms)
+
+# root files
+grid_file_1km = "/data/R/GeoSpatialData/Population_demography/Norway_SSB/Processed/master_grid_1km.tif"
+grid_file_100m = "/data/R/GeoSpatialData/Population_demography/Norway_SSB/Processed/master_grid_100m.tif"
+
+# write files to GRASS
+rgrass7::execGRASS("r.in.gdal", input = grid_file_1km, output = "master_grid_1km_norway")
+rgrass7::execGRASS("r.in.gdal", input = grid_file_100m, output = "master_grid_100m_norway")
+```
+
+# Landscape data
 
 ## Data from Norway
 
@@ -615,6 +735,402 @@ for(i in file) {
 # document
 
 ```
+
+# Industrial infrastructure
+
+## Industrial areas and buildings
+
+### Norway
+
+```{r industrial_areas_no}
+# go into mapset
+ms <- "p_sam_industry"
+execGRASS("g.mapset", mapset = ms)
+
+#---
+# settings
+type_of_info <- "industry"
+
+#---
+# import temporary layer with industrial areas
+
+# schema
+gisdata_schema <- "sam_tmp"
+# layer to use
+layer_name <- "tmp_industrial_areas_no"
+# schema and layer
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+
+# import railways
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+
+#---
+# import temporary layer with industrial buildings (points)
+
+# schema
+gisdata_schema <- "sam_tmp"
+# layer to use
+layer_name <- "tmp_industrial_buildings_no"
+# schema and layer
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+
+# import railways
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+
+#-----------------
+# rasterize
+
+# rasterize industrial areas with value 0.5
+# region
+rgrass7::execGRASS("g.region", raster = "master_grid_100m_norway@p_sam_tools", 
+                   flags = "p")
+# mask
+rgrass7::execGRASS("r.mask", vector = "norway_limits@p_sam_tools")
+# rasterize
+rgrass7::execGRASS("v.to.rast", input = "tmp_industrial_areas_no", type = "area",
+                   output = "tmp_industrial_areas_x05_no", use = "val", value = 0.5)
+
+# rasterize houses counting the number of features per pixel
+rgrass7::execGRASS("g.region", raster = "master_grid_100m_norway@p_sam_tools", 
+                   flags = "p")
+# rgrass7::execGRASS("r.mask", flags = "r")
+oneimpact::grass_v2rast_count(x = "tmp_industrial_buildings_no", 
+                              output = "tmp_industrial_buildings_count_no", 
+                              set_region = FALSE)
+
+#-----------------
+# patch results
+
+# region
+rgrass7::execGRASS("g.region", raster = "master_grid_100m_norway@p_sam_tools", 
+                   flags = "p")
+# mask
+rgrass7::execGRASS("r.mask", vector = "norway_limits@p_sam_tools")
+# patch
+rgrass7::execGRASS("r.patch", input = "tmp_industrial_areas_x05_no,tmp_industrial_buildings_count_no",
+                   output = "industrial_buildings_count_no")
+# export for checking
+# dir <- "../data/sam_env/industry/industrial/processed/"
+# rgrass7::execGRASS("r.out.gdal", input = "industrial_buildings_count_no", 
+#                    output = paste0(dir, "industrial_buildings_count_no.tif"),
+#                    createopt = "COMPRESS=DEFLATE")
+# remove mask
+rgrass7::execGRASS("r.mask", flags = "r")
+```
+
+### Sweden
+
+
+
+# Transport and urban infrastructure
+
+## Data from Sweden
+
+Here we load the transport and urban infrastructure datasets from Sweden into GRASS GIS.
+
+## Roads
+
+### Norway
+
+to do after checking summer/winter, adapt
+
+```{r roads_no}
+# go into mapset
+ms <- "p_sam_transport_urban"
+execGRASS("g.mapset", mapset = ms)
+
+#---
+# settings
+type_of_info <- "transport_urban"
+
+#---
+# folder
+gisdata_schema <- "sam_env"
+
+#---
+# public roads
+
+# layer to use
+layer_name <- "public_roads_se"
+# schema and layer
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+
+# list files
+# execGRASS("v.external", input="PG:host=gisdata-db.nina.no user=bernardo.brandao dbname=gisdata", flags = "l")
+
+# import public roads
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+
+#---
+# private roads
+
+# layer to use
+layer_name <- "private_roads_se"
+# schema and layer
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+
+# import public roads
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+```
+
+### Sweden
+
+```{r roads_sweden}
+# go into mapset
+ms <- "p_sam_transport_urban"
+execGRASS("g.mapset", mapset = ms)
+
+#---
+# settings
+type_of_info <- "transport_urban"
+
+#---
+# folder
+gisdata_schema <- "sam_env"
+
+#---
+# public roads
+
+# layer to use
+layer_name <- "public_roads_se"
+# schema and layer
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+
+# list files
+# execGRASS("v.external", input="PG:host=gisdata-db.nina.no user=bernardo.brandao dbname=gisdata", flags = "l")
+
+# import public roads
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+
+#---
+# private roads
+
+# layer to use
+layer_name <- "private_roads_se"
+# schema and layer
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+
+# import public roads
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+```
+
+## Railways
+
+### Norway
+
+Import vector first
+
+```{r railways_no}
+# go into mapset
+ms <- "p_sam_transport_urban"
+execGRASS("g.mapset", mapset = ms)
+
+#---
+# settings
+type_of_info <- "transport_urban"
+
+#---
+# folder
+gisdata_schema <- "sam_env"
+
+#---
+# railways
+
+# layer to use
+layer_name <- "railways_no"
+# schema and layer
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+
+# list files
+# execGRASS("v.external", input="PG:host=gisdata-db.nina.no user=bernardo.brandao dbname=gisdata", flags = "l")
+
+# import railways
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+```
+
+Then rasterize
+
+### Sweden
+
+```{r railways_sweden}
+# go into mapset
+ms <- "p_sam_transport_urban"
+execGRASS("g.mapset", mapset = ms)
+
+#---
+# settings
+type_of_info <- "transport_urban"
+
+#---
+# folder
+gisdata_schema <- "sam_env"
+
+#---
+# railways
+
+# layer to use
+layer_name <- "railways_se"
+# schema and layer
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+
+# list files
+# execGRASS("v.external", input="PG:host=gisdata-db.nina.no user=bernardo.brandao dbname=gisdata", flags = "l")
+
+# import railways
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+```
+
+## Houses
+
+### Norway
+
+Import temporary files on urban and houses, rasterize them, then merge
+
+```{r houses_urban_no}
+# go into mapset
+ms <- "p_sam_transport_urban"
+execGRASS("g.mapset", mapset = ms)
+
+#---
+# settings
+type_of_info <- "transport_urban"
+
+#---
+# import temporary layer with urban areas
+
+# schema
+gisdata_schema <- "sam_tmp"
+# layer to use
+layer_name <- "tmp_urban_no"
+# schema and layer
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+
+# list files
+# execGRASS("v.external", input="PG:host=gisdata-db.nina.no user=bernardo.brandao dbname=gisdata", flags = "l")
+
+# import railways
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+
+#---
+# import temporary layer with houses (points)
+
+# schema
+gisdata_schema <- "sam_tmp"
+# layer to use
+layer_name <- "tmp_houses_not_urban_no"
+# schema and layer
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+
+# list files
+# execGRASS("v.external", input="PG:host=gisdata-db.nina.no user=bernardo.brandao dbname=gisdata", flags = "l")
+
+# import railways
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+
+#-----------------
+# rasterize
+
+# rasterize urban areas with value 10
+rgrass7::execGRASS("g.region", raster = "master_grid_100m_norway@p_sam_tools", 
+                   flags = "p")
+rgrass7::execGRASS("v.to.rast", input = "tmp_urban_no", type = "area",
+                   output = "tmp_urban_x10_no", use = "val", value = 10)
+
+# rasterize houses counting the number of features per pixel
+rgrass7::execGRASS("g.region", raster = "master_grid_100m_norway@p_sam_tools", 
+                   flags = "p")
+# rgrass7::execGRASS("r.mask", flags = "r")
+oneimpact::grass_v2rast_count(x = "tmp_houses_not_urban_no", 
+                              output = "tmp_houses_not_urban_count_no", 
+                              set_region = FALSE)
+
+#-----------------
+# patch results
+
+# region
+rgrass7::execGRASS("g.region", raster = "master_grid_100m_norway@p_sam_tools", 
+                   flags = "p")
+# mask
+rgrass7::execGRASS("r.mask", vector = "norway_limits@p_sam_tools")
+# patch
+rgrass7::execGRASS("r.patch", input = "tmp_urban_x10_no,tmp_houses_not_urban_count_no",
+                   output = "houses_count_no")
+# export for checking
+dir <- "../data/sam_env/transport_urban/houses/processed/"
+rgrass7::execGRASS("r.out.gdal", input = "houses_count_no", 
+                   output = paste0(dir, "houses_count_no.tif"),
+                   createopt = "COMPRESS=DEFLATE")
+# remove mask
+rgrass7::execGRASS("r.mask", flags = "r")
+
+```
+
+Import vector file, then rasterize
+
+```{r houses_sweden}
+# go into mapset
+ms <- "p_sam_transport_urban"
+execGRASS("g.mapset", mapset = ms)
+
+#---
+# settings
+type_of_info <- "transport_urban"
+
+#---
+# folder
+gisdata_schema <- "sam_env"
+
+#---
+# houses
+
+# layer to use
+layer_name <- "houses_se"
+# schema and layer
+sch_lay <- paste(gisdata_schema, layer_name, sep = ".")
+
+# list files
+# execGRASS("v.external", input="PG:host=gisdata-db.nina.no user=bernardo.brandao dbname=gisdata", flags = "l")
+
+# import railways
+execGRASS("v.in.ogr", input = str_con, layer = sch_lay, 
+          output = layer_name, flags = "overwrite")
+
+#--------------------
+# rasterize houses
+# rasterize houses counting the number of features per pixel
+rgrass7::execGRASS("g.region", vector = "herding_districts_se_union@p_sam_tools",
+                   align = "master_grid_100m_norway@p_sam_tools", 
+                   flags = "p")
+# mask
+rgrass7::execGRASS("r.mask", vector = "herding_districts_se_union@p_sam_tools")
+# rgrass7::execGRASS("r.mask", flags = "r")
+oneimpact::grass_v2rast_count(x = "houses_se", 
+                              output = "houses_count_se", 
+                              set_region = FALSE, 
+                              overwrite = TRUE)
+# export for checking
+dir <- "../data/sam_env/transport_urban/houses/processed/"
+rgrass7::execGRASS("r.out.gdal", input = "houses_count_se", 
+                   output = paste0(dir, "houses_count_se.tif"),
+                   createopt = "COMPRESS=DEFLATE")
+# remove mask
+rgrass7::execGRASS("r.mask", flags = "r")
+```
+
+We must now patch the maps for Norway and Sweden
+
+Virtual raster?
+
 
 
 
